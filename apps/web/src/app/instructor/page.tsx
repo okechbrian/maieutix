@@ -4,8 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { GraduationCap, ArrowRight } from "lucide-react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
-
 export default function InstructorLoginPage() {
   const router = useRouter();
   const [classroomId, setClassroomId] = useState("");
@@ -23,7 +21,7 @@ export default function InstructorLoginPage() {
     setError("");
 
     try {
-      const res = await fetch(`${API_URL}/classrooms/${classroomId}`);
+      const res = await fetch(`/api/classrooms/${classroomId}`);
       if (!res.ok) {
         throw new Error("Classroom not found");
       }
@@ -31,7 +29,7 @@ export default function InstructorLoginPage() {
         throw new Error("Invalid password");
       }
       router.push(`/instructor/${classroomId}`);
-    } catch (err) {
+    } catch {
       setError("Invalid credentials. Use password: instructor123");
     } finally {
       setLoading(false);
@@ -61,7 +59,7 @@ export default function InstructorLoginPage() {
                 type="text"
                 value={classroomId}
                 onChange={(e) => setClassroomId(e.target.value)}
-                placeholder="Enter classroom UUID"
+                placeholder="MAI-101 or class-demo"
                 className="w-full px-4 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
               />
             </div>
@@ -92,7 +90,7 @@ export default function InstructorLoginPage() {
           </form>
 
           <p className="text-xs text-slate-500 mt-4 text-center">
-            Demo password: instructor123
+            Demo class: MAI-101. Demo password: instructor123
           </p>
         </div>
       </div>

@@ -62,6 +62,13 @@ export default function CodeEditor({
         options={{
           readOnly: disabled,
           minimap: { enabled: false },
+          quickSuggestions: false,
+          suggestOnTriggerCharacters: false,
+          acceptSuggestionOnEnter: "off",
+          tabCompletion: "off",
+          wordBasedSuggestions: "off",
+          parameterHints: { enabled: false },
+          inlineSuggest: { enabled: false },
           fontSize: 14,
           lineNumbers: "on",
           scrollBeyondLastLine: false,

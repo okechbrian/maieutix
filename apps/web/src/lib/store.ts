@@ -1,0 +1,412 @@
+import { courses, getDefaultLesson, getLesson } from "./curriculum";
+import { analyzeReasoningSignals } from "./maieutic";
+import { createClient } from "../utils/supabase/server";
+import type {
+  Assignment,
+  Classroom,
+  DialogueTurn,
+  LearningSession,
+  ReflectionScore,
+  School,
+  Submission,
+  User,
+} from "./types";
+
+function mapSession(row: any): LearningSession {
+  return {
+    id: row.id,
+    classroomId: row.classroom_id,
+    assignmentId: row.assignment_id,
+    lessonId: row.lesson_id,
+    studentUserId: row.student_user_id,
+    studentName: row.users?.full_name || "Unknown", // Assuming a join with users table
+    currentPhase: row.current_phase,
+    specText: row.spec_text,
+    codeText: row.code_text,
+    testOutput: row.test_output,
+    reflectionText: row.reflection_text,
+    reflectionScore: row.reflection_score,
+    startedAt: row.started_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapClassroom(row: any): Classroom {
+  return {
+    id: row.id,
+    schoolId: row.school_id,
+    teacherId: row.teacher_id,
+    name: row.name,
+    joinCode: row.join_code,
+    createdAt: row.created_at,
+  };
+}
+
+export function listCourses() {
+  return courses;
+}
+
+export async function listClassrooms() {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from('classrooms').select('*');
+  if (error) throw new Error(error.message);
+  
+  const classrooms = data.map(mapClassroom);
+  
+  // To get stats, we should ideally use a view or RPC, but for now we'll fetch sessions too
+  const { data: sessionsData } = await supabase.from('sessions').select('id, classroom_id, current_phase, reflection_score');
+  
+  return classrooms.map(classroom => {
+    const sessions = (sessionsData || []).filter(s => s.classroom_id === classroom.id);
+    const scores = sessions.map(s => s.reflection_score).filter((s): s is number => typeof s === 'number');
+    const activeStudents = sessions.filter(s => s.current_phase !== 'complete').length;
+    const avgReflectionScore = scores.length ? Number((scores.reduce((sum, score) => sum + score, 0) / scores.length).toFixed(1)) : 0;
+    
+    return {
+      ...classroom,
+      join_code: classroom.joinCode,
+      active_students: activeStudents,
+      activeStudents: activeStudents,
+      avg_reflection_score: avgReflectionScore,
+      avgReflectionScore: avgReflectionScore,
+    };
+  });
+}
+
+export async function getClassroom(classroomIdOrCode: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('classrooms')
+    .select('*')
+    .or(`id.eq.${classroomIdOrCode},join_code.ilike.${classroomIdOrCode}`)
+    .single();
+    
+  if (error || !data) return undefined;
+  return mapClassroom(data);
+}
+
+export async function createClassroom(name: string) {
+  const supabase = await createClient();
+  
+  // We need to know the teacher's ID and school ID. 
+  // In a real app, this comes from the authenticated user.
+  // For the sake of the migration without full auth wired up everywhere yet,
+  // we assume the demo teacher exists or we fetch the current user.
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) throw new Error("Not authenticated");
+  
+  const { data: userRecord } = await supabase.from('users').select('school_id').eq('id', userData.user.id).single();
+  if (!userRecord) throw new Error("User record not found");
+
+  const joinCode = `MAI-${Math.floor(100 + Math.random() * 900)}`;
+
+  const { data, error } = await supabase.from('classrooms').insert({
+    school_id: userRecord.school_id,
+    teacher_id: userData.user.id,
+    name,
+    join_code: joinCode
+  }).select().single();
+  
+  if (error) throw new Error(error.message);
+  
+  const classroom = mapClassroom(data);
+  
+  // Create default assignment
+  await createAssignment(classroom.id, getDefaultLesson().id);
+  
+  return classroom;
+}
+
+export async function listAssignments(classroomId?: string) {
+  const supabase = await createClient();
+  let query = supabase.from('assignments').select('*');
+  if (classroomId) {
+    query = query.eq('classroom_id', classroomId);
+  }
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+  
+  return data.map(row => ({
+    id: row.id,
+    classroomId: row.classroom_id,
+    lessonId: row.lesson_id,
+    title: row.title,
+    createdAt: row.created_at,
+    lesson: getLesson(row.lesson_id)
+  }));
+}
+
+export async function createAssignment(classroomId: string, lessonId: string) {
+  const supabase = await createClient();
+  const lesson = getLesson(lessonId) ?? getDefaultLesson();
+  
+  const { data, error } = await supabase.from('assignments').insert({
+    classroom_id: classroomId,
+    lesson_id: lesson.id,
+    title: lesson.title
+  }).select().single();
+  
+  if (error) throw new Error(error.message);
+  return {
+    id: data.id,
+    classroomId: data.classroom_id,
+    lessonId: data.lesson_id,
+    title: data.title,
+    createdAt: data.created_at,
+  };
+}
+
+export async function createSession(input: {
+  classroomId: string;
+  studentName: string;
+  assignmentId?: string;
+  lessonId?: string;
+}) {
+  const supabase = await createClient();
+  const classroom = await getClassroom(input.classroomId);
+  if (!classroom) throw new Error("Classroom not found");
+  
+  let assignmentId = input.assignmentId;
+  if (!assignmentId) {
+    const assignments = await listAssignments(classroom.id);
+    assignmentId = assignments[0]?.id;
+  }
+  if (!assignmentId) {
+    const assignment = await createAssignment(classroom.id, input.lessonId ?? getDefaultLesson().id);
+    assignmentId = assignment.id;
+  }
+  
+  const assignments = await listAssignments(classroom.id);
+  const assignment = assignments.find(a => a.id === assignmentId);
+  const lesson = getLesson(input.lessonId ?? assignment?.lessonId) ?? getDefaultLesson();
+  
+  // Ensure user is authenticated. In this simplified model, 
+  // student needs to be signed up. If anonymous auth is not used, 
+  // we might need to handle user creation first.
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) throw new Error("Not authenticated as student");
+
+  const { data: sessionData, error: sessionError } = await supabase.from('sessions').insert({
+    classroom_id: classroom.id,
+    assignment_id: assignmentId,
+    lesson_id: lesson.id,
+    student_user_id: userData.user.id,
+    current_phase: 'spec',
+    code_text: lesson.starterCode
+  }).select('*, users(full_name)').single();
+  
+  if (sessionError) throw new Error(sessionError.message);
+  
+  const session = mapSession(sessionData);
+  
+  await addDialogueTurn(session.id, "coach", `Before coding, describe your plan for "${lesson.title}". What inputs, steps, and output should your program have?`);
+  
+  return session;
+}
+
+export async function getSession(sessionId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from('sessions').select('*, users(full_name)').eq('id', sessionId).single();
+  if (error || !data) return undefined;
+  return mapSession(data);
+}
+
+export async function updateSession(sessionId: string, patch: Partial<LearningSession>) {
+  const supabase = await createClient();
+  
+  const dbPatch: any = {};
+  if (patch.currentPhase !== undefined) dbPatch.current_phase = patch.currentPhase;
+  if (patch.specText !== undefined) dbPatch.spec_text = patch.specText;
+  if (patch.codeText !== undefined) dbPatch.code_text = patch.codeText;
+  if (patch.testOutput !== undefined) dbPatch.test_output = patch.testOutput;
+  if (patch.reflectionText !== undefined) dbPatch.reflection_text = patch.reflectionText;
+  if (patch.reflectionScore !== undefined) dbPatch.reflection_score = patch.reflectionScore;
+  dbPatch.updated_at = new Date().toISOString();
+
+  const { data, error } = await supabase.from('sessions').update(dbPatch).eq('id', sessionId).select('*, users(full_name)').single();
+  if (error) throw new Error(error.message);
+  return mapSession(data);
+}
+
+export async function addDialogueTurn(sessionId: string, role: DialogueTurn["role"], content: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from('dialogue_turns').insert({
+    session_id: sessionId,
+    role,
+    content
+  }).select().single();
+  
+  if (error) throw new Error(error.message);
+  
+  return {
+    id: data.id,
+    sessionId: data.session_id,
+    role: data.role as any,
+    content: data.content,
+    timestamp: data.created_at,
+  };
+}
+
+export async function listDialogue(sessionId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from('dialogue_turns').select('*').eq('session_id', sessionId).order('created_at', { ascending: true });
+  if (error) throw new Error(error.message);
+  
+  return data.map(row => ({
+    id: row.id,
+    sessionId: row.session_id,
+    role: row.role as any,
+    content: row.content,
+    timestamp: row.created_at,
+  }));
+}
+
+export async function addSubmission(sessionId: string, codeText: string, gapAnalysis: Record<string, string>, reflectionPrompts: string[]) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from('submissions').insert({
+    session_id: sessionId,
+    code_text: codeText,
+    gap_analysis: gapAnalysis,
+    reflection_prompts: reflectionPrompts
+  }).select().single();
+  
+  if (error) throw new Error(error.message);
+  
+  return {
+    id: data.id,
+    sessionId: data.session_id,
+    codeText: data.code_text,
+    gapAnalysis: data.gap_analysis,
+    reflectionPrompts: data.reflection_prompts as string[],
+    createdAt: data.created_at,
+  };
+}
+
+export async function addReflectionScore(sessionId: string, score: number, message: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from('reflection_scores').insert({
+    session_id: sessionId,
+    score,
+    message
+  }).select().single();
+  
+  if (error) throw new Error(error.message);
+  
+  return {
+    id: data.id,
+    sessionId: data.session_id,
+    score: data.score,
+    message: data.message,
+    createdAt: data.created_at,
+  };
+}
+
+export async function listClassroomStudents(classroomId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from('sessions').select('*, users(full_name)').eq('classroom_id', classroomId);
+  if (error) throw new Error(error.message);
+  
+  return data.map(row => {
+    const session = mapSession(row);
+    return {
+      id: session.id,
+      student_name: session.studentName,
+      studentName: session.studentName,
+      current_phase: session.currentPhase,
+      currentPhase: session.currentPhase,
+      spec_text: session.specText,
+      specText: session.specText,
+      code_text: session.codeText,
+      codeText: session.codeText,
+      reflection_score: session.reflectionScore,
+      reflectionScore: session.reflectionScore,
+      started_at: session.startedAt,
+      startedAt: session.startedAt,
+      updated_at: session.updatedAt,
+      updatedAt: session.updatedAt,
+    };
+  });
+}
+
+export async function getClassroomInsights(classroomId: string) {
+  const supabase = await createClient();
+  const { data: sessionsData, error } = await supabase.from('sessions').select('*, users(full_name)').eq('classroom_id', classroomId);
+  if (error) throw new Error(error.message);
+  
+  const sessions = sessionsData.map(mapSession);
+  
+  const phaseDistribution = sessions.reduce<Record<string, number>>((acc, session) => {
+    acc[session.currentPhase] = (acc[session.currentPhase] ?? 0) + 1;
+    return acc;
+  }, {});
+  
+  const scores = sessions
+    .map((session) => session.reflectionScore)
+    .filter((score): score is number => typeof score === "number");
+  const avgScore = scores.length ? Number((scores.reduce((sum, score) => sum + score, 0) / scores.length).toFixed(1)) : 0;
+  
+  // Get all submissions for the classroom
+  const { data: submissionsData } = await supabase.from('submissions')
+    .select('*, sessions!inner(classroom_id)')
+    .eq('sessions.classroom_id', classroomId)
+    .order('created_at', { ascending: false });
+    
+  const latestSubmissionsBySession = new Map<string, Record<string, string>>();
+  if (submissionsData) {
+    for (const sub of submissionsData) {
+      if (!latestSubmissionsBySession.has(sub.session_id)) {
+        latestSubmissionsBySession.set(sub.session_id, sub.gap_analysis as Record<string, string>);
+      }
+    }
+  }
+
+  const sessionsInput = sessions.map(session => ({
+    ...session,
+    latestGapAnalysis: latestSubmissionsBySession.get(session.id)
+  }));
+  
+  const { reasoningSignals, exemplarReflections } = analyzeReasoningSignals(sessionsInput);
+  
+  const struggles = reasoningSignals.map((signal) => `${signal.label}: ${signal.count} student${signal.count === 1 ? "" : "s"}`);
+  
+  const latestSubmission = submissionsData?.[0];
+  
+  return {
+    struggles,
+    reasoning_signals: reasoningSignals,
+    reasoningSignals,
+    exemplar_reflections: exemplarReflections,
+    exemplarReflections,
+    phase_distribution: phaseDistribution,
+    phaseDistribution,
+    avg_score: avgScore,
+    avgScore,
+    most_common_gap: latestSubmission ? Object.values(latestSubmission.gap_analysis as Record<string, string>)[0] ?? "No common gap yet" : "No common gap yet",
+    mostCommonGap: latestSubmission ? Object.values(latestSubmission.gap_analysis as Record<string, string>)[0] ?? "No common gap yet" : "No common gap yet",
+    total_students: sessions.length,
+    totalStudents: sessions.length,
+  };
+}
+
+export async function addAiEvent(event: any) {
+  const supabase = await createClient();
+  const { data: session } = await supabase.from('sessions').select('classroom_id').eq('id', event.sessionId).single();
+  const { data: classroom } = session ? await supabase.from('classrooms').select('school_id').eq('id', session.classroom_id).single() : { data: null };
+
+  await supabase.from('ai_events').insert({
+    session_id: event.sessionId,
+    classroom_id: session?.classroom_id,
+    school_id: classroom?.school_id,
+    model: event.model,
+    status: event.status,
+    prompt_tokens: event.prompt_tokens,
+    completion_tokens: event.completion_tokens,
+    error: event.error,
+  });
+}
+
+export async function getAiAuditEvents() {
+  const supabase = await createClient();
+  const { data } = await supabase.from('ai_events').select('*').order('created_at', { ascending: false });
+  return data || [];
+}

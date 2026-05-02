@@ -10,8 +10,6 @@ const CodeEditor = dynamic(
   { ssr: false, loading: () => <div className="h-[400px] bg-slate-900 animate-pulse rounded-lg" /> }
 );
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
-
 interface Session {
   id: string;
   classroomId: string;
@@ -19,6 +17,12 @@ interface Session {
   currentPhase: string;
   specText: string | null;
   codeText: string | null;
+  lesson?: {
+    title: string;
+    prompt: string;
+    visibleTests: string[];
+    starterCode: string;
+  };
 }
 
 interface DialogueTurn {
@@ -82,17 +86,20 @@ export default function SessionPage() {
   const [reflectionMessage, setReflectionMessage] = useState("");
   const [gapAnalysis, setGapAnalysis] = useState<GapAnalysis | null>(null);
   const [reflectionPrompts, setReflectionPrompts] = useState<string[]>([]);
+  const [runOutput, setRunOutput] = useState("");
+  const [runningCode, setRunningCode] = useState(false);
 
   const [specInput, setSpecInput] = useState("");
   const [chatInput, setChatInput] = useState("");
   const [codeInput, setCodeInput] = useState("# Write your code here\n");
   const [reflectionInput, setReflectionInput] = useState("");
+  const [actionError, setActionError] = useState("");
 
   const fetchSession = useCallback(async () => {
     try {
       const [sessionRes, statusRes] = await Promise.all([
-        fetch(`${API_URL}/sessions/${sessionId}`),
-        fetch(`${API_URL}/sessions/${sessionId}/editor-status`),
+        fetch(`/api/sessions/${sessionId}`),
+        fetch(`/api/sessions/${sessionId}/editor-status`),
       ]);
 
       if (sessionRes.ok) {
@@ -100,6 +107,9 @@ export default function SessionPage() {
         setSession(data);
         if (data.specText && !specInput) {
           setSpecInput(data.specText);
+        }
+        if (data.codeText && codeInput === "# Write your code here\n") {
+          setCodeInput(data.codeText);
         }
       }
 
@@ -110,11 +120,11 @@ export default function SessionPage() {
     } catch (err) {
       console.error("Failed to fetch session", err);
     }
-  }, [sessionId, specInput]);
+  }, [sessionId, specInput, codeInput]);
 
-  const fetchDialogue = async () => {
+  const fetchDialogue = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/sessions/${sessionId}/dialogue`);
+      const res = await fetch(`/api/sessions/${sessionId}/dialogue`);
       if (res.ok) {
         const data = await res.json();
         setTurns(data);
@@ -122,13 +132,13 @@ export default function SessionPage() {
     } catch (err) {
       console.error("Failed to fetch dialogue", err);
     }
-  };
+  }, [sessionId]);
 
-  const fetchAll = async () => {
+  const fetchAll = useCallback(async () => {
     setLoading(true);
     await Promise.all([fetchSession(), fetchDialogue()]);
     setLoading(false);
-  };
+  }, [fetchSession, fetchDialogue]);
 
   useEffect(() => {
     fetchAll();
@@ -137,16 +147,17 @@ export default function SessionPage() {
       fetchDialogue();
     }, 5000);
     return () => clearInterval(interval);
-  }, [fetchSession]);
+  }, [fetchAll, fetchSession, fetchDialogue]);
 
   const handleSendSpec = async () => {
     if (!specInput.trim()) return;
     setSendingSpec(true);
+    setActionError("");
     try {
-      const res = await fetch(`${API_URL}/sessions/${sessionId}/spec`, {
+      const res = await fetch(`/api/sessions/${sessionId}/spec`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ spec_text: specInput }),
+        body: JSON.stringify({ specText: specInput }),
       });
       if (res.ok) {
         await fetchSession();
@@ -162,8 +173,9 @@ export default function SessionPage() {
   const handleSendChat = async () => {
     if (!chatInput.trim()) return;
     setSendingChat(true);
+    setActionError("");
     try {
-      const res = await fetch(`${API_URL}/sessions/${sessionId}/chat`, {
+      const res = await fetch(`/api/sessions/${sessionId}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: chatInput }),
@@ -179,21 +191,56 @@ export default function SessionPage() {
     }
   };
 
+  const handleRunCode = async () => {
+    setRunningCode(true);
+    setRunOutput("Loading Python runner...");
+    try {
+      const win = window as typeof window & {
+        loadPyodide?: (options: { stdout: (text: string) => void; stderr: (text: string) => void }) => Promise<{ runPythonAsync: (code: string) => Promise<unknown> }>;
+      };
+      if (!win.loadPyodide) {
+        await new Promise<void>((resolve, reject) => {
+          const script = document.createElement("script");
+          script.src = "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js";
+          script.onload = () => resolve();
+          script.onerror = () => reject(new Error("Pyodide failed to load"));
+          document.body.appendChild(script);
+        });
+      }
+      const output: string[] = [];
+      const pyodide = await win.loadPyodide!({
+        stdout: (text) => output.push(text),
+        stderr: (text) => output.push(text),
+      });
+      const result = await pyodide.runPythonAsync(codeInput);
+      if (result !== undefined) output.push(String(result));
+      setRunOutput(output.join("\n") || "Code ran without printed output.");
+    } catch (error) {
+      setRunOutput(error instanceof Error ? error.message : "Code failed to run.");
+    } finally {
+      setRunningCode(false);
+    }
+  };
+
   const handleSubmitCode = async () => {
     setSendingCode(true);
+    setActionError("");
     setGapAnalysis(null);
     setReflectionPrompts([]);
     try {
-      const res = await fetch(`${API_URL}/sessions/${sessionId}/submit-code`, {
+      const res = await fetch(`/api/sessions/${sessionId}/submit-code`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ spec_text: codeInput }),
+        body: JSON.stringify({ codeText: codeInput, testOutput: runOutput }),
       });
       if (res.ok) {
         const data = await res.json();
         setGapAnalysis(data.gapAnalysis);
         setReflectionPrompts(data.reflectionPrompts);
         await fetchSession();
+      } else {
+        const data = await res.json();
+        setActionError(data.error ?? "Code could not be submitted.");
       }
     } catch (err) {
       console.error("Failed to submit code", err);
@@ -206,10 +253,10 @@ export default function SessionPage() {
     if (!reflectionInput.trim()) return;
     setSubmittingReflection(true);
     try {
-      const res = await fetch(`${API_URL}/sessions/${sessionId}/reflect`, {
+      const res = await fetch(`/api/sessions/${sessionId}/reflect`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reflection_text: reflectionInput }),
+        body: JSON.stringify({ reflectionText: reflectionInput }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -225,14 +272,20 @@ export default function SessionPage() {
   };
 
   const handleApproveSpec = async () => {
+    setActionError("");
     try {
-      const res = await fetch(`${API_URL}/sessions/${sessionId}/approve-spec`, {
+      const res = await fetch(`/api/sessions/${sessionId}/approve-spec`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ approved: true }),
       });
       if (res.ok) {
         await fetchSession();
+        await fetchDialogue();
+      } else {
+        const data = await res.json();
+        setActionError(data.error ?? "Spec is not ready yet.");
+        await fetchDialogue();
       }
     } catch (err) {
       console.error("Failed to approve spec", err);
@@ -253,7 +306,6 @@ export default function SessionPage() {
 
   const currentPhaseIndex = PHASES.indexOf(session.currentPhase);
   const isSpecPhase = session.currentPhase === "spec";
-  const isApprovedPhase = session.currentPhase === "approved";
   const isReflectingPhase = session.currentPhase === "reflecting" || session.currentPhase === "submitted";
   const isComplete = session.currentPhase === "complete";
   const canEdit = editorStatus?.can_edit || false;
@@ -265,6 +317,11 @@ export default function SessionPage() {
           <h2 className="text-xl font-semibold text-slate-800">
             Welcome, {session.studentName}
           </h2>
+          {session.lesson && (
+            <p className="mt-1 text-sm text-slate-600">
+              {session.lesson.title}: {session.lesson.prompt}
+            </p>
+          )}
           <div className="flex items-center gap-2 mt-2">
             {PHASES.map((phase, index) => {
               const Icon = PHASE_ICONS[phase];
@@ -337,9 +394,10 @@ export default function SessionPage() {
                 onClick={handleApproveSpec}
                 className="ml-3 bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition-colors"
               >
-                Approve Spec
+                Ask Coach to Approve Spec
               </button>
             )}
+            {actionError && <p className="mt-3 text-sm text-red-600">{actionError}</p>}
           </div>
 
           <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
@@ -411,6 +469,30 @@ export default function SessionPage() {
               {sendingCode ? "Submitting..." : "Submit Code"}
             </button>
           )}
+          {(canEdit || session.currentPhase === "submitted" || session.currentPhase === "reflecting") && (
+            <button
+              onClick={handleRunCode}
+              disabled={runningCode}
+              className="ml-3 mt-3 bg-slate-800 text-white py-2 px-4 rounded-md hover:bg-slate-900 disabled:opacity-50 transition-colors"
+            >
+              {runningCode ? "Running..." : "Run Python"}
+            </button>
+          )}
+          {runOutput && (
+            <pre className="mt-4 max-h-48 overflow-auto rounded-md bg-slate-950 p-4 text-sm text-slate-100 whitespace-pre-wrap">
+              {runOutput}
+            </pre>
+          )}
+          {session.lesson?.visibleTests?.length ? (
+            <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-4">
+              <h4 className="text-sm font-medium text-slate-700">Visible checks</h4>
+              <ul className="mt-2 list-disc pl-5 text-sm text-slate-600">
+                {session.lesson.visibleTests.map((test) => (
+                  <li key={test}>{test}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
       )}
 

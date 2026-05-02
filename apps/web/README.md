@@ -1,8 +1,8 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+Maieutix is a school coding platform prototype built as a single Next.js app. The current implementation includes local route handlers for class join, lesson sessions, Socratic coaching, teacher dashboards, and reporting while the Supabase production database is being connected.
 
 ## Getting Started
 
-First, run the development server:
+First, install dependencies and run the development server:
 
 ```bash
 npm run dev
@@ -16,16 +16,41 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Demo paths:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `/` student join. Use class code `MAI-101`.
+- `/teacher` teacher dashboard.
+- `/instructor` legacy instructor entry. Use class `MAI-101` and password `instructor123`.
+- `/admin` AI audit events.
+
+Core Maieutic behavior:
+
+- Students write a specification first.
+- The editor unlocks only after the coach approves the spec.
+- Monaco autocomplete and inline suggestions are disabled.
+- The API rejects code submission before approval.
+- Submission compares spec intent against code behavior and prompts reflection.
+
+Environment:
+
+- Copy `.env.example` into Vercel project settings or a local `.env.local`.
+- `MAIEUTIX_AI_MODEL` defaults to `gpt-5-mini`.
+- Without `OPENAI_API_KEY`, the coach uses a safe fallback prompt so classrooms are not blocked during local demos.
+
+Production database:
+
+- Apply `../../infra/supabase/migrations/0001_school_platform.sql` in Supabase.
+- Replace the in-memory store in `src/lib/store.ts` with Supabase queries behind the same route contracts.
 
 ## Learn More
 
-To learn more about Next.js, take a look at the following resources:
+Quality checks:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm run lint
+npm run typecheck
+npm run build
+```
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 

@@ -2,9 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import { Users, Brain, AlertTriangle, Eye, ArrowLeft, GraduationCap } from "lucide-react";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
 interface Student {
   id: string;
@@ -20,6 +19,16 @@ interface Insights {
   avg_score: number;
   most_common_gap: string;
   total_students: number;
+  reasoning_signals?: Array<{
+    label: string;
+    count: number;
+    studentNames: string[];
+  }>;
+  exemplar_reflections?: Array<{
+    studentName: string;
+    reflectionText: string;
+    score: number;
+  }>;
 }
 
 interface Classroom {
@@ -53,9 +62,9 @@ export default function InstructorDashboard() {
   const fetchData = useCallback(async () => {
     try {
       const [classRes, studentsRes, insightsRes] = await Promise.all([
-        fetch(`${API_URL}/classrooms/${classroomId}`),
-        fetch(`${API_URL}/classrooms/${classroomId}/students`),
-        fetch(`${API_URL}/classrooms/${classroomId}/insights`),
+        fetch(`/api/classrooms/${classroomId}`),
+        fetch(`/api/classrooms/${classroomId}/students`),
+        fetch(`/api/classrooms/${classroomId}/insights`),
       ]);
 
       if (classRes.ok) setClassroom(await classRes.json());
@@ -63,6 +72,8 @@ export default function InstructorDashboard() {
       if (insightsRes.ok) setInsights(await insightsRes.json());
     } catch (err) {
       console.error("Failed to fetch data", err);
+    } finally {
+      setLoading(false);
     }
   }, [classroomId]);
 
@@ -98,10 +109,10 @@ export default function InstructorDashboard() {
               <p className="text-sm text-slate-500">Code: {classroom.join_code}</p>
             </div>
           </div>
-          <a href="/" className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-800">
+          <Link href="/" className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-800">
             <ArrowLeft className="w-4 h-4" />
             Back
-          </a>
+          </Link>
         </div>
       </header>
 
@@ -148,6 +159,46 @@ export default function InstructorDashboard() {
                 <li key={i} className="text-sm text-yellow-700">• {s}</li>
               ))}
             </ul>
+          </div>
+        )}
+
+        {insights && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+              <h3 className="font-medium text-slate-800 mb-3">Reasoning Signals</h3>
+              <div className="space-y-3">
+                {(insights.reasoning_signals ?? []).slice(0, 5).map((signal) => (
+                  <div key={signal.label} className="flex items-start justify-between gap-4 border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+                    <div>
+                      <p className="text-sm font-medium text-slate-700">{signal.label}</p>
+                      <p className="mt-1 text-xs text-slate-500">{signal.studentNames.slice(0, 4).join(", ") || "No students"}</p>
+                    </div>
+                    <span className="rounded bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">{signal.count}</span>
+                  </div>
+                ))}
+                {(insights.reasoning_signals ?? []).length === 0 && (
+                  <p className="text-sm text-slate-500">Signals appear after students submit specs and code.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+              <h3 className="font-medium text-slate-800 mb-3">Strong Reflections</h3>
+              <div className="space-y-3">
+                {(insights.exemplar_reflections ?? []).map((example) => (
+                  <div key={`${example.studentName}-${example.score}`} className="border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-medium text-slate-700">{example.studentName}</p>
+                      <span className="text-xs font-semibold text-teal-700">{example.score}/5</span>
+                    </div>
+                    <p className="mt-1 line-clamp-2 text-sm text-slate-600">{example.reflectionText}</p>
+                  </div>
+                ))}
+                {(insights.exemplar_reflections ?? []).length === 0 && (
+                  <p className="text-sm text-slate-500">High-quality reflection examples will appear here after scoring.</p>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
