@@ -64,7 +64,8 @@ export async function createCoachReply(sessionId: string, message: string) {
   }
 
   try {
-    const response = await fetch("https://api.openai.com/v1/responses", {
+    const baseUrl = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1/chat/completions";
+    const response = await fetch(baseUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -72,27 +73,14 @@ export async function createCoachReply(sessionId: string, message: string) {
       },
       body: JSON.stringify({
         model: MODEL,
-        instructions: COACH_INSTRUCTIONS,
-        max_output_tokens: 220,
-        store: false,
-        input: [
+        messages: [
+          { role: "system", content: COACH_INSTRUCTIONS },
           {
             role: "user",
-            content: [
-              {
-                type: "input_text",
-                text: [
-                  `Lesson: ${lesson?.title}`,
-                  `Prompt: ${lesson?.prompt}`,
-                  `Expected concepts: ${lesson?.expectedConcepts.join(", ")}`,
-                  `Current spec: ${session.specText ?? "not written"}`,
-                  `Recent dialogue: ${turns.slice(-6).map((turn) => `${turn.role}: ${turn.content}`).join("\n")}`,
-                  `Student message: ${message}`,
-                ].join("\n\n"),
-              },
-            ],
+            content: `Lesson: ${lesson?.title}\nPrompt: ${lesson?.prompt}\nExpected concepts: ${lesson?.expectedConcepts.join(", ")}\nCurrent spec: ${session.specText ?? "not written"}\nRecent dialogue: ${turns.slice(-6).map((turn) => `${turn.role}: ${turn.content}`).join("\n")}\nStudent message: ${message}`,
           },
         ],
+        max_tokens: 220,
       }),
     });
 

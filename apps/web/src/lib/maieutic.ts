@@ -10,7 +10,8 @@ const MODEL = process.env.MAIEUTIX_AI_MODEL || DEFAULT_MODEL;
 export async function evaluateSpecQuality(specText: string): Promise<SpecQuality> {
   if (process.env.OPENAI_API_KEY) {
     try {
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      const baseUrl = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1/chat/completions";
+      const response = await fetch(baseUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -87,7 +88,8 @@ export async function evaluateSpecQuality(specText: string): Promise<SpecQuality
 export async function buildGapAnalysis(specText: string | null, codeText: string, expectedConcepts: string[]): Promise<Record<string, string>> {
   if (process.env.OPENAI_API_KEY && specText) {
     try {
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      const baseUrl = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1/chat/completions";
+      const response = await fetch(baseUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
