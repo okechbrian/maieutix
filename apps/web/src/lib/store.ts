@@ -33,6 +33,15 @@ type ClassroomRow = {
   created_at: string;
 };
 
+type AssignmentRow = {
+  id: string;
+  classroom_id: string;
+  lesson_id: string;
+  title: string;
+  due_at: string | null;
+  created_at: string;
+};
+
 type AiEventInput = {
   sessionId: string;
   model: string;
@@ -79,27 +88,42 @@ export function listCourses() {
 
 export async function listClassrooms() {
   const supabase = await createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) throw new Error("Not authenticated");
+
   const { data, error } = await supabase.from('classrooms').select('*');
   if (error) throw new Error(error.message);
   
   const classrooms = data.map(mapClassroom);
   
   // To get stats, we should ideally use a view or RPC, but for now we'll fetch sessions too
-  const { data: sessionsData } = await supabase.from('sessions').select('id, classroom_id, current_phase, reflection_score');
+  const { data: sessionsData } = await supabase.from('sessions').select('id, classroom_id, current_phase, reflection_score, updated_at');
   
   return classrooms.map(classroom => {
     const sessions = (sessionsData || []).filter(s => s.classroom_id === classroom.id);
     const scores = sessions.map(s => s.reflection_score).filter((s): s is number => typeof s === 'number');
     const activeStudents = sessions.filter(s => s.current_phase !== 'complete').length;
+    const completedStudents = sessions.filter(s => s.current_phase === 'complete').length;
     const avgReflectionScore = scores.length ? Number((scores.reduce((sum, score) => sum + score, 0) / scores.length).toFixed(1)) : 0;
+    const latestUpdatedAt = sessions
+      .map((session) => session.updated_at)
+      .filter(Boolean)
+      .sort()
+      .at(-1) ?? null;
     
     return {
       ...classroom,
       join_code: classroom.joinCode,
       active_students: activeStudents,
       activeStudents: activeStudents,
+      completed_students: completedStudents,
+      completedStudents: completedStudents,
+      total_students: sessions.length,
+      totalStudents: sessions.length,
       avg_reflection_score: avgReflectionScore,
       avgReflectionScore: avgReflectionScore,
+      latest_activity_at: latestUpdatedAt,
+      latestActivityAt: latestUpdatedAt,
     };
   });
 }
@@ -156,15 +180,44 @@ export async function listAssignments(classroomId?: string) {
   }
   const { data, error } = await query;
   if (error) throw new Error(error.message);
+
+  const assignmentIds = data.map((row: AssignmentRow) => row.id);
+  const { data: sessionsData } = assignmentIds.length
+    ? await supabase
+      .from('sessions')
+      .select('assignment_id, current_phase, reflection_score')
+      .in('assignment_id', assignmentIds)
+    : { data: [] };
   
-  return data.map(row => ({
-    id: row.id,
-    classroomId: row.classroom_id,
-    lessonId: row.lesson_id,
-    title: row.title,
-    createdAt: row.created_at,
-    lesson: getLesson(row.lesson_id)
-  }));
+  return data.map((row: AssignmentRow) => {
+    const sessions = (sessionsData || []).filter((session) => session.assignment_id === row.id);
+    const scores = sessions.map((session) => session.reflection_score).filter((score): score is number => typeof score === 'number');
+    const completedStudents = sessions.filter((session) => session.current_phase === 'complete').length;
+    const activeStudents = sessions.filter((session) => session.current_phase !== 'complete').length;
+    const avgReflectionScore = scores.length ? Number((scores.reduce((sum, score) => sum + score, 0) / scores.length).toFixed(1)) : 0;
+
+    return {
+      id: row.id,
+      classroomId: row.classroom_id,
+      classroom_id: row.classroom_id,
+      lessonId: row.lesson_id,
+      lesson_id: row.lesson_id,
+      title: row.title,
+      dueAt: row.due_at,
+      due_at: row.due_at,
+      createdAt: row.created_at,
+      created_at: row.created_at,
+      activeStudents,
+      active_students: activeStudents,
+      completedStudents,
+      completed_students: completedStudents,
+      totalStudents: sessions.length,
+      total_students: sessions.length,
+      avgReflectionScore,
+      avg_reflection_score: avgReflectionScore,
+      lesson: getLesson(row.lesson_id)
+    };
+  });
 }
 
 export async function createAssignment(classroomId: string, lessonId: string) {
@@ -210,7 +263,8 @@ export async function createSession(input: {
   
   const assignments = await listAssignments(classroom.id);
   const assignment = assignments.find(a => a.id === assignmentId);
-  const lesson = getLesson(input.lessonId ?? assignment?.lessonId) ?? getDefaultLesson();
+  const lessonId = input.lessonId ?? assignment?.lessonId ?? getDefaultLesson().id;
+  const lesson = getLesson(lessonId) ?? getDefaultLesson();
   
   // Ensure user is authenticated. In this simplified model, 
   // student needs to be signed up. If anonymous auth is not used, 
