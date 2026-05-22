@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { signupTeacher } from "./actions";
 
 export default function SignupPage() {
@@ -29,8 +30,8 @@ export default function SignupPage() {
     <div className="min-h-[80vh] flex items-center justify-center p-4">
       <form onSubmit={handleSubmit} className="w-full max-w-lg bg-white border border-slate-200 rounded-lg p-8 shadow-sm space-y-4">
         <div>
-          <h2 className="text-2xl font-semibold text-slate-900">Create Pilot School</h2>
-          <p className="text-sm text-slate-600 mt-1">Start a free Maieutix pilot for one teacher and one Python class.</p>
+          <h2 className="text-2xl font-semibold text-slate-900">Teacher Sign Up</h2>
+          <p className="text-sm text-slate-600 mt-1">Create a teacher workspace, set up your school, and start a Python pilot class.</p>
         </div>
         
         {error && (
@@ -101,8 +102,23 @@ export default function SignupPage() {
           disabled={loading}
           className="w-full rounded-md bg-teal-600 px-4 py-2 font-medium text-white hover:bg-teal-700 disabled:opacity-50"
         >
-          {loading ? "Creating..." : "Create pilot"}
+          {loading ? "Creating..." : "Create teacher workspace"}
         </button>
+
+        <div className="space-y-2 border-t border-slate-200 pt-4 text-sm">
+          <p className="text-slate-600">
+            Already have a teacher account?{" "}
+            <Link href="/login" className="font-medium text-teal-700 hover:text-teal-900">
+              Log in
+            </Link>
+          </p>
+          <p className="text-slate-600">
+            Student joining a class?{" "}
+            <Link href="/" className="font-medium text-teal-700 hover:text-teal-900">
+              Use your class code
+            </Link>
+          </p>
+        </div>
       </form>
     </div>
   );

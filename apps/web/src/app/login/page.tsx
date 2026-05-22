@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { login } from "./actions";
 
 export default function LoginPage() {
@@ -79,6 +80,21 @@ export default function LoginPage() {
         >
           {loading ? "Signing in..." : "Continue"}
         </button>
+
+        <div className="space-y-2 border-t border-slate-200 pt-4 text-sm">
+          <p className="text-slate-600">
+            New teacher?{" "}
+            <Link href="/signup" className="font-medium text-teal-700 hover:text-teal-900">
+              Create a teacher account
+            </Link>
+          </p>
+          <p className="text-slate-600">
+            New student?{" "}
+            <Link href="/" className="font-medium text-teal-700 hover:text-teal-900">
+              Join with a class code
+            </Link>
+          </p>
+        </div>
       </form>
     </div>
   );

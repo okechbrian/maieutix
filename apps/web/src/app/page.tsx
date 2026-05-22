@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { joinClassroom } from "./actions";
 
 export default function JoinPage() {
@@ -31,7 +32,7 @@ export default function JoinPage() {
         <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-8">
           <h2 className="text-2xl font-semibold text-slate-800 mb-2">Join a Classroom</h2>
           <p className="text-slate-600 mb-6">
-            Create your student account to join a class. Demo code: MAI-101.
+            Students create an account with a class code from their teacher. Demo code: MAI-101.
           </p>
 
           {error && (
@@ -108,12 +109,22 @@ export default function JoinPage() {
               {loading ? "Joining..." : "Join Classroom"}
             </button>
           </form>
-          <div className="mt-5 flex items-center justify-between text-sm">
-            <a href="/login" className="text-slate-500 hover:text-slate-800">Already have an account? Log in</a>
+          <div className="mt-5 rounded-md border border-slate-200 bg-slate-50 p-4">
+            <h3 className="text-sm font-semibold text-slate-900">Teachers</h3>
+            <p className="mt-1 text-sm text-slate-600">
+              Create a teacher workspace to make classes, share join codes, and monitor student progress.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Link href="/signup" className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800">
+                Teacher sign up
+              </Link>
+              <Link href="/login" className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">
+                Teacher log in
+              </Link>
+            </div>
           </div>
-          <div className="mt-2 flex items-center justify-between text-sm">
-             <a href="/teacher" className="text-teal-700 hover:text-teal-900">Teacher dashboard</a>
-             <a href="/signup" className="text-teal-700 hover:text-teal-900">Create Pilot School</a>
+          <div className="mt-5 text-sm">
+            <Link href="/login" className="text-slate-500 hover:text-slate-800">Already have an account? Log in</Link>
           </div>
         </div>
       </div>
