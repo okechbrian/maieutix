@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Check, Circle, PartyPopper, ArrowRight, Lightbulb } from "lucide-react";
+import { Alert, Button, PageContainer, PageFrame, Panel, StatusBadge, TextArea, TextInput, cn } from "@/components/ui";
 
 const CodeEditor = dynamic(
   () => import("@/components/CodeEditor"),
@@ -307,9 +308,13 @@ export default function SessionPage() {
 
   if (loading || !session) {
     return (
-      <div className="min-h-[80vh] flex items-center justify-center">
-        <p className="text-slate-500">Loading session...</p>
-      </div>
+      <PageFrame className="flex items-center">
+        <PageContainer className="max-w-3xl">
+          <Panel>
+            <div className="px-4 py-16 text-center text-sm text-slate-500">Loading session...</div>
+          </Panel>
+        </PageContainer>
+      </PageFrame>
     );
   }
 
@@ -320,18 +325,22 @@ export default function SessionPage() {
   const canEdit = editorStatus?.can_edit || false;
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-xl font-semibold text-slate-800">
-            Welcome, {session.studentName}
-          </h2>
+    <PageFrame>
+      <PageContainer>
+      <div className="mb-6 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+          <p className="text-sm font-medium text-teal-700">Learning session</p>
+          <h1 className="mt-1 text-2xl font-semibold text-slate-950">
+            {session.lesson?.title ?? "Python lesson"}
+          </h1>
           {session.lesson && (
-            <p className="mt-1 text-sm text-slate-600">
-              {session.lesson.title}: {session.lesson.prompt}
+            <p className="mt-1 max-w-4xl text-sm leading-6 text-slate-600">
+              {session.lesson.prompt}
             </p>
           )}
-          <div className="flex items-center gap-2 mt-2">
+          <p className="mt-2 text-sm text-slate-500">Student: {session.studentName}</p>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
             {PHASES.map((phase, index) => {
               const Icon = PHASE_ICONS[phase];
               const isActive = index <= currentPhaseIndex;
@@ -353,14 +362,16 @@ export default function SessionPage() {
           </div>
         </div>
         {!isComplete && editorStatus && (
-          <div className={`px-4 py-2 rounded-md text-sm ${canEdit || isReflectingPhase ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}`}>
+          <div className={cn("rounded-md border px-4 py-3 text-sm font-medium", canEdit || isReflectingPhase ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800")}>
             {editorStatus.reason}
           </div>
         )}
       </div>
+      </div>
 
       {isComplete && (
-        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-12 text-center">
+        <Panel>
+        <div className="p-12 text-center">
           <PartyPopper className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
           <h3 className="text-2xl font-semibold text-slate-800 mb-2">Exercise Complete!</h3>
           <p className="text-slate-600 mb-6">
@@ -379,38 +390,42 @@ export default function SessionPage() {
             Start Another Exercise
           </button>
         </div>
+        </Panel>
       )}
 
       {!isComplete && isSpecPhase && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-            <h3 className="font-medium text-slate-800 mb-3">Write Your Spec</h3>
-            <textarea
+          <Panel title="Write your spec" description="Describe inputs, steps, output, and one edge case before coding.">
+            <div className="p-4">
+            <TextArea
               value={specInput}
               onChange={(e) => setSpecInput(e.target.value)}
               placeholder="Describe what you want to build..."
-              className="w-full h-40 p-3 border border-slate-300 rounded-md focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none resize-none"
+              className="h-44 resize-none"
             />
-            <button
+            <div className="mt-3 flex flex-wrap gap-2">
+            <Button
               onClick={handleSendSpec}
               disabled={sendingSpec || !specInput.trim()}
-              className="mt-3 bg-teal-600 text-white py-2 px-4 rounded-md hover:bg-teal-700 disabled:opacity-50 transition-colors"
+              loading={sendingSpec}
             >
               {sendingSpec ? "Saving..." : "Save Spec"}
-            </button>
+            </Button>
             {session.specText && (
-              <button
+              <Button
                 onClick={handleApproveSpec}
-                className="ml-3 bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition-colors"
+                variant="dark"
               >
-                Ask Coach to Approve Spec
-              </button>
+                Ask coach to review
+              </Button>
             )}
-            {actionError && <p className="mt-3 text-sm text-red-600">{actionError}</p>}
-          </div>
+            </div>
+            {actionError && <div className="mt-3"><Alert>{actionError}</Alert></div>}
+            </div>
+          </Panel>
 
-          <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-            <h3 className="font-medium text-slate-800 mb-3">Chat with AI Coach</h3>
+          <Panel title="Chat with AI coach" description="Ask for reasoning help, not complete answers.">
+            <div className="p-4">
             <div className="h-64 overflow-y-auto space-y-3 mb-3 p-2">
               {turns.length === 0 ? (
                 <p className="text-slate-500 text-sm">Start a conversation about your spec...</p>
@@ -433,34 +448,37 @@ export default function SessionPage() {
               )}
             </div>
             <div className="flex gap-2">
-              <input
+              <TextInput
                 type="text"
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSendChat()}
                 placeholder="Ask a question..."
-                className="flex-1 px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                className="flex-1"
               />
-              <button
+              <Button
                 onClick={handleSendChat}
                 disabled={sendingChat || !chatInput.trim()}
-                className="bg-teal-600 text-white py-2 px-4 rounded-md hover:bg-teal-700 disabled:opacity-50 transition-colors"
+                loading={sendingChat}
               >
                 Send
-              </button>
+              </Button>
             </div>
-          </div>
+            </div>
+          </Panel>
         </div>
       )}
 
       {!isComplete && (
-        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+        <Panel>
+        <div className="p-4">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="font-medium text-slate-800">Code Editor</h3>
+            <div>
+              <h3 className="font-medium text-slate-950">Code editor</h3>
+              <p className="mt-1 text-sm text-slate-500">Run Python, compare against the spec, then submit for reflection.</p>
+            </div>
             {!canEdit && session.currentPhase !== "submitted" && session.currentPhase !== "reflecting" && (
-              <span className="text-sm text-slate-500">
-                Complete spec approval to unlock
-              </span>
+              <StatusBadge tone="warning">Spec approval required</StatusBadge>
             )}
           </div>
           <CodeEditor
@@ -470,22 +488,25 @@ export default function SessionPage() {
             language="python"
           />
           {(canEdit || session.currentPhase === "submitted" || session.currentPhase === "reflecting") && (
-            <button
+            <Button
               onClick={handleSubmitCode}
               disabled={sendingCode}
-              className="mt-3 bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 disabled:opacity-50 transition-colors"
+              loading={sendingCode}
+              className="mt-3"
             >
               {sendingCode ? "Submitting..." : "Submit Code"}
-            </button>
+            </Button>
           )}
           {(canEdit || session.currentPhase === "submitted" || session.currentPhase === "reflecting") && (
-            <button
+            <Button
               onClick={handleRunCode}
               disabled={runningCode}
-              className="ml-3 mt-3 bg-slate-800 text-white py-2 px-4 rounded-md hover:bg-slate-900 disabled:opacity-50 transition-colors"
+              loading={runningCode}
+              variant="dark"
+              className="ml-3 mt-3"
             >
               {runningCode ? "Running..." : "Run Python"}
-            </button>
+            </Button>
           )}
           {runOutput && (
             <pre className="mt-4 max-h-48 overflow-auto rounded-md bg-slate-950 p-4 text-sm text-slate-100 whitespace-pre-wrap">
@@ -503,11 +524,12 @@ export default function SessionPage() {
             </div>
           ) : null}
         </div>
+        </Panel>
       )}
 
       {(isReflectingPhase || gapAnalysis) && !isComplete && (
-        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6 mt-6">
-          <h3 className="font-medium text-slate-800 mb-3">Reflection</h3>
+        <Panel className="mt-6" title="Reflection" description="Compare your final code with your original plan.">
+          <div className="p-4">
           
           {gapAnalysis && Object.keys(gapAnalysis).length > 0 && (
             <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -535,11 +557,11 @@ export default function SessionPage() {
             </div>
           )}
 
-          <textarea
+          <TextArea
             value={reflectionInput}
             onChange={(e) => setReflectionInput(e.target.value)}
             placeholder="Write your reflection..."
-            className="w-full h-32 p-3 border border-slate-300 rounded-md focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none resize-none"
+            className="h-32 resize-none"
           />
           
           {reflectionScore && (
@@ -550,16 +572,19 @@ export default function SessionPage() {
           )}
 
           {!reflectionScore && (
-            <button
+            <Button
               onClick={handleSubmitReflection}
               disabled={submittingReflection || !reflectionInput.trim()}
-              className="mt-3 bg-teal-600 text-white py-2 px-4 rounded-md hover:bg-teal-700 disabled:opacity-50 transition-colors"
+              loading={submittingReflection}
+              className="mt-3"
             >
               {submittingReflection ? "Submitting..." : "Submit Reflection"}
-            </button>
+            </Button>
           )}
-        </div>
+          </div>
+        </Panel>
       )}
-    </div>
+      </PageContainer>
+    </PageFrame>
   );
 }

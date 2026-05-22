@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BookOpen, CheckCircle2, Clock, Layers, Play, Users } from "lucide-react";
+import { CheckCircle2, Clock, Layers, Play, Users } from "lucide-react";
 import { createClient } from "@/utils/supabase/server";
 import { startStudentSession } from "./actions";
+import { Button, EmptyState, MetricCard, PageContainer, PageFrame, PageHeader, Panel, StatusBadge } from "@/components/ui";
 
 type ClassroomRecord = {
   id: string;
@@ -101,37 +102,22 @@ export default async function StudentPage() {
   const sessionByAssignmentId = new Map(sessions.map((session) => [session.assignment_id, session]));
 
   return (
-    <div className="min-h-[80vh] bg-slate-50 px-4 py-6 sm:px-6">
-      <div className="mx-auto max-w-6xl">
-        <header className="mb-6">
-          <p className="text-sm font-medium text-teal-700">Student home</p>
-          <h1 className="mt-1 text-2xl font-semibold text-slate-950">Welcome, {profile.full_name}</h1>
-          <p className="mt-1 text-sm text-slate-600">Resume your coding sessions or start the next class assignment.</p>
-        </header>
+    <PageFrame>
+      <PageContainer className="max-w-6xl">
+        <PageHeader
+          eyebrow="Student home"
+          title={`Welcome, ${profile.full_name}`}
+          description="Continue active work, start assigned lessons, and review completed sessions."
+        />
 
         <section className="grid gap-3 md:grid-cols-4">
-          <div className="rounded-md border border-slate-200 bg-white p-4">
-            <div className="flex items-center gap-2 text-sm text-slate-500"><Users className="h-4 w-4" /> Classes</div>
-            <p className="mt-2 text-2xl font-semibold text-slate-950">{enrollments.length}</p>
-          </div>
-          <div className="rounded-md border border-slate-200 bg-white p-4">
-            <div className="flex items-center gap-2 text-sm text-slate-500"><Layers className="h-4 w-4" /> Assigned</div>
-            <p className="mt-2 text-2xl font-semibold text-slate-950">{assignments.length}</p>
-          </div>
-          <div className="rounded-md border border-slate-200 bg-white p-4">
-            <div className="flex items-center gap-2 text-sm text-slate-500"><Clock className="h-4 w-4" /> Active sessions</div>
-            <p className="mt-2 text-2xl font-semibold text-slate-950">{activeSessions.length}</p>
-          </div>
-          <div className="rounded-md border border-slate-200 bg-white p-4">
-            <div className="flex items-center gap-2 text-sm text-slate-500"><CheckCircle2 className="h-4 w-4" /> Completed</div>
-            <p className="mt-2 text-2xl font-semibold text-slate-950">{completedSessions.length}</p>
-          </div>
+          <MetricCard icon={<Users className="h-4 w-4" />} label="Classes" value={enrollments.length} />
+          <MetricCard icon={<Layers className="h-4 w-4" />} label="Assigned" value={assignments.length} />
+          <MetricCard icon={<Clock className="h-4 w-4" />} label="Active" value={activeSessions.length} />
+          <MetricCard icon={<CheckCircle2 className="h-4 w-4" />} label="Completed" value={completedSessions.length} />
         </section>
 
-        <section className="mt-6 rounded-md border border-slate-200 bg-white">
-          <div className="border-b border-slate-200 px-4 py-3">
-            <h2 className="font-medium text-slate-950">Current work</h2>
-          </div>
+        <Panel className="mt-6" title="Continue learning" description="Active sessions that are waiting for your next step.">
           <div className="divide-y divide-slate-200">
             {activeSessions.map((session) => {
               const assignment = one(session.assignments);
@@ -147,7 +133,7 @@ export default async function StudentPage() {
                   </div>
                   <Link
                     href={`/session/${session.id}`}
-                    className="inline-flex items-center justify-center gap-2 rounded-md bg-teal-600 px-3 py-2 text-sm font-medium text-white hover:bg-teal-700"
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-teal-600 px-3 py-2 text-sm font-medium text-white hover:bg-teal-700"
                   >
                     <Play className="h-4 w-4" />
                     Resume
@@ -156,19 +142,12 @@ export default async function StudentPage() {
               );
             })}
             {activeSessions.length === 0 && (
-              <div className="px-4 py-10 text-center">
-                <BookOpen className="mx-auto h-8 w-8 text-slate-400" />
-                <h3 className="mt-3 font-medium text-slate-950">No active sessions</h3>
-                <p className="mt-1 text-sm text-slate-600">Start an assigned lesson below when you are ready.</p>
-              </div>
+              <EmptyState title="No active sessions" description="Start an assigned lesson below when you are ready." />
             )}
           </div>
-        </section>
+        </Panel>
 
-        <section className="mt-6 rounded-md border border-slate-200 bg-white">
-          <div className="border-b border-slate-200 px-4 py-3">
-            <h2 className="font-medium text-slate-950">Assigned lessons</h2>
-          </div>
+        <Panel className="mt-6" title="Assigned lessons" description="Lessons your teacher has assigned to your classes.">
           <div className="divide-y divide-slate-200">
             {assignments.map((assignment) => {
               const classroom = classroomById.get(assignment.classroom_id);
@@ -176,12 +155,13 @@ export default async function StudentPage() {
               const session = sessionByAssignmentId.get(assignment.id);
               const isComplete = session?.current_phase === "complete";
               const status = session ? (isComplete ? "Complete" : "In progress") : "Not started";
+              const tone = session ? (isComplete ? "success" : "primary") : "muted";
               return (
                 <div key={assignment.id} className="flex flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-medium text-slate-950">{assignment.title || lesson?.title || "Python lesson"}</p>
-                      <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">{status}</span>
+                      <StatusBadge tone={tone}>{status}</StatusBadge>
                     </div>
                     <p className="mt-1 text-sm text-slate-600">{lesson?.prompt ?? "Continue your class assignment."}</p>
                     <p className="mt-2 text-xs text-slate-500">
@@ -191,7 +171,7 @@ export default async function StudentPage() {
                   {session ? (
                     <Link
                       href={`/session/${session.id}`}
-                      className="inline-flex items-center justify-center gap-2 rounded-md bg-teal-600 px-3 py-2 text-sm font-medium text-white hover:bg-teal-700"
+                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-teal-600 px-3 py-2 text-sm font-medium text-white hover:bg-teal-700"
                     >
                       <Play className="h-4 w-4" />
                       {isComplete ? "Review" : "Resume"}
@@ -200,38 +180,34 @@ export default async function StudentPage() {
                     <form action={startStudentSession}>
                       <input type="hidden" name="classroomId" value={assignment.classroom_id} />
                       <input type="hidden" name="assignmentId" value={assignment.id} />
-                      <button className="inline-flex items-center justify-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800">
+                      <Button variant="dark">
                         <Play className="h-4 w-4" />
                         Start
-                      </button>
+                      </Button>
                     </form>
                   )}
                 </div>
               );
             })}
             {enrollments.length > 0 && assignments.length === 0 && (
-              <div className="px-4 py-10 text-center">
-                <BookOpen className="mx-auto h-8 w-8 text-slate-400" />
-                <h3 className="mt-3 font-medium text-slate-950">No assigned lessons yet</h3>
-                <p className="mt-1 text-sm text-slate-600">Your teacher has not assigned a lesson to this class yet.</p>
-              </div>
+              <EmptyState title="No assigned lessons yet" description="Your teacher has not assigned a lesson to this class yet." />
             )}
             {enrollments.length === 0 && (
-              <div className="px-4 py-10 text-center">
-                <p className="text-sm text-slate-600">You are not enrolled in a class yet.</p>
+              <EmptyState
+                title="You are not enrolled in a class yet"
+                description="Use the class code from your teacher to join."
+                action={
                 <Link href="/" className="mt-3 inline-block rounded-md bg-teal-600 px-3 py-2 text-sm font-medium text-white hover:bg-teal-700">
                   Join with a class code
                 </Link>
-              </div>
+                }
+              />
             )}
           </div>
-        </section>
+        </Panel>
 
         {completedSessions.length > 0 && (
-          <section className="mt-6 rounded-md border border-slate-200 bg-white">
-            <div className="border-b border-slate-200 px-4 py-3">
-              <h2 className="font-medium text-slate-950">Completed</h2>
-            </div>
+          <Panel className="mt-6" title="Completed" description="Finished work you can review later.">
             <div className="divide-y divide-slate-200">
               {completedSessions.map((session) => {
                 const assignment = one(session.assignments);
@@ -255,9 +231,9 @@ export default async function StudentPage() {
                 );
               })}
             </div>
-          </section>
+          </Panel>
         )}
-      </div>
-    </div>
+      </PageContainer>
+    </PageFrame>
   );
 }

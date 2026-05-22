@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Activity,
-  AlertCircle,
   BookOpen,
   CheckCircle2,
   Clipboard,
@@ -12,6 +11,7 @@ import {
   Plus,
   Users,
 } from "lucide-react";
+import { Alert, Button, EmptyState, MetricCard, PageContainer, PageFrame, PageHeader, Panel, TextInput } from "@/components/ui";
 
 interface Classroom {
   id: string;
@@ -121,80 +121,61 @@ export default function TeacherDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-6 sm:px-6">
-      <div className="mx-auto max-w-7xl">
-        <header className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-sm font-medium text-teal-700">Teacher workspace</p>
-            <h1 className="mt-1 text-2xl font-semibold text-slate-950">Classes</h1>
-            <p className="mt-1 text-sm text-slate-600">Create pilot classes, share join codes, and monitor student progress.</p>
-          </div>
+    <PageFrame>
+      <PageContainer>
+        <PageHeader
+          eyebrow="Teacher workspace"
+          title="Classes"
+          description="Create classes, share join codes, assign lessons, and monitor student progress."
+          actions={
           <form onSubmit={createClass} className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-            <input
+            <TextInput
               value={className}
               onChange={(event) => setClassName(event.target.value)}
               placeholder="Class name"
-              className="min-w-0 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500 sm:w-64"
+              className="sm:w-64"
             />
-            <button
-              disabled={creating}
-              className="inline-flex items-center justify-center gap-2 rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:cursor-not-allowed disabled:bg-teal-300"
-            >
-              {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              Create
-            </button>
+            <Button type="submit" loading={creating}>
+              {!creating && <Plus className="h-4 w-4" />}
+              Create class
+            </Button>
           </form>
-        </header>
+          }
+        />
 
         {error && (
-          <div className="mb-4 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-            <div>
+          <div className="mb-4">
+            <Alert>
               <p className="font-medium">{error}</p>
               {error === "Not authenticated" && (
                 <a href="/login" className="mt-1 inline-block text-red-800 underline underline-offset-2">Log in as a teacher</a>
               )}
-            </div>
+            </Alert>
           </div>
         )}
 
         <section className="grid gap-3 md:grid-cols-4">
-          <div className="rounded-md border border-slate-200 bg-white p-4">
-            <div className="flex items-center gap-2 text-sm text-slate-500"><BookOpen className="h-4 w-4" /> Classes</div>
-            <p className="mt-2 text-2xl font-semibold text-slate-950">{classrooms.length}</p>
-          </div>
-          <div className="rounded-md border border-slate-200 bg-white p-4">
-            <div className="flex items-center gap-2 text-sm text-slate-500"><Users className="h-4 w-4" /> Active students</div>
-            <p className="mt-2 text-2xl font-semibold text-slate-950">{metrics.activeStudents}</p>
-          </div>
-          <div className="rounded-md border border-slate-200 bg-white p-4">
-            <div className="flex items-center gap-2 text-sm text-slate-500"><CheckCircle2 className="h-4 w-4" /> Completed</div>
-            <p className="mt-2 text-2xl font-semibold text-slate-950">{metrics.completedStudents}</p>
-          </div>
-          <div className="rounded-md border border-slate-200 bg-white p-4">
-            <div className="flex items-center gap-2 text-sm text-slate-500"><Activity className="h-4 w-4" /> Avg reflection</div>
-            <p className="mt-2 text-2xl font-semibold text-slate-950">{metrics.avgReflectionScore || "-"}/5</p>
-          </div>
+          <MetricCard icon={<BookOpen className="h-4 w-4" />} label="Classes" value={classrooms.length} />
+          <MetricCard icon={<Users className="h-4 w-4" />} label="Active students" value={metrics.activeStudents} />
+          <MetricCard icon={<CheckCircle2 className="h-4 w-4" />} label="Completed" value={metrics.completedStudents} />
+          <MetricCard icon={<Activity className="h-4 w-4" />} label="Avg reflection" value={`${metrics.avgReflectionScore || "-"}/5`} />
         </section>
 
-        <section className="mt-6 overflow-hidden rounded-md border border-slate-200 bg-white">
-          <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-            <h2 className="font-medium text-slate-950">Class operations</h2>
-            <span className="text-sm text-slate-500">{metrics.totalStudents} total student sessions</span>
-          </div>
-
+        <Panel
+          className="mt-6"
+          title="Class operations"
+          description={`${metrics.totalStudents} total student sessions across your classes.`}
+        >
           {loading ? (
             <div className="flex items-center justify-center gap-2 px-4 py-14 text-sm text-slate-500">
               <Loader2 className="h-4 w-4 animate-spin" />
               Loading classes
             </div>
           ) : classrooms.length === 0 ? (
-            <div className="px-4 py-14 text-center">
-              <h3 className="text-base font-medium text-slate-950">No classes yet</h3>
-              <p className="mx-auto mt-2 max-w-md text-sm text-slate-600">
-                Create the first pilot class to generate a join code and start assigning Python lessons.
-              </p>
-            </div>
+            <EmptyState
+              title="No classes yet"
+              description="Create the first class to generate a join code and start assigning Python lessons."
+            />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[820px]">
@@ -220,7 +201,7 @@ export default function TeacherDashboardPage() {
                       <tr key={classroom.id} className="text-sm">
                         <td className="px-4 py-3">
                           <p className="font-medium text-slate-950">{classroom.name}</p>
-                          <p className="mt-0.5 text-xs text-slate-500">{classroom.id}</p>
+                          <p className="mt-0.5 text-xs text-slate-500">Latest activity: {formatDate(latestActivity)}</p>
                         </td>
                         <td className="px-4 py-3">
                           <button
@@ -250,8 +231,8 @@ export default function TeacherDashboardPage() {
               </table>
             </div>
           )}
-        </section>
-      </div>
-    </div>
+        </Panel>
+      </PageContainer>
+    </PageFrame>
   );
 }

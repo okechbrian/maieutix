@@ -105,12 +105,13 @@ export default function CodeEditor({
         }}
       />
       {disabled && (
-        <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-10">
-          <div className="bg-slate-800 px-6 py-4 rounded-lg border border-slate-700 flex items-center gap-3 shadow-xl">
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+          <div className="flex max-w-sm items-center gap-3 rounded-md border border-slate-700 bg-slate-900 px-4 py-3 shadow-xl">
             <Lock className="w-5 h-5 text-slate-400" />
-            <span className="text-slate-300 font-medium">
-              Editor locked until spec is approved
-            </span>
+            <div>
+              <p className="text-sm font-medium text-slate-100">Editor locked</p>
+              <p className="mt-1 text-xs leading-5 text-slate-400">Save a clear spec and ask the coach to review it before coding.</p>
+            </div>
           </div>
         </div>
       )}

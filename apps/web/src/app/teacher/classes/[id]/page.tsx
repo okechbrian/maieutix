@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import {
-  AlertCircle,
   BookOpen,
   CheckCircle2,
   Clipboard,
@@ -15,6 +14,7 @@ import {
   Users,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
+import { Alert, Button, EmptyState, MetricCard, PageContainer, PageFrame, PageHeader, Panel, StatusBadge } from "@/components/ui";
 
 interface Student {
   id: string;
@@ -244,25 +244,35 @@ export default function TeacherClassPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-6 sm:px-6">
-      <div className="mx-auto max-w-7xl">
-        <header className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <a href="/teacher" className="text-sm font-medium text-teal-700 hover:text-teal-900">Back to classes</a>
-            <h1 className="mt-2 text-2xl font-semibold text-slate-950">{classroom?.name ?? "Class workspace"}</h1>
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-600">
-              <span>Join code: {classroom?.joinCode ?? classroom?.join_code ?? classroomId}</span>
+    <PageFrame>
+      <PageContainer>
+        <PageHeader
+          eyebrow="Class workspace"
+          title={classroom?.name ?? "Class workspace"}
+          description="Assign lessons, monitor student phases, and review reasoning signals."
+          actions={
+            <div className="flex flex-col gap-2 sm:flex-row">
               <button
                 onClick={copyJoinCode}
-                className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
                 title="Copy join code"
               >
-                <Clipboard className="h-3.5 w-3.5" />
-                {copied ? "Copied" : "Copy"}
+                <Clipboard className="h-4 w-4" />
+                {copied ? "Copied" : `Join code ${classroom?.joinCode ?? classroom?.join_code ?? classroomId}`}
               </button>
+              <Button type="button" variant="dark" onClick={exportCsv}>
+                <Download className="h-4 w-4" />
+                Export CSV
+              </Button>
             </div>
-          </div>
-          <div className="flex gap-2">
+          }
+        />
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <a href="/teacher" className="text-sm font-medium text-teal-700 hover:text-teal-900">Back to classes</a>
+          <span className="text-sm text-slate-400">/</span>
+          <span className="text-sm text-slate-500">{filtered.length} students shown</span>
+        </div>
+          <div className="mb-4 flex gap-2">
             <label className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700">
               <Filter className="h-4 w-4" />
               <select value={phase} onChange={(event) => setPhase(event.target.value)} className="bg-transparent outline-none">
@@ -275,48 +285,30 @@ export default function TeacherClassPage() {
                 <option value="complete">Complete</option>
               </select>
             </label>
-            <button onClick={exportCsv} className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800">
-              <Download className="h-4 w-4" />
-              CSV
-            </button>
           </div>
-        </header>
 
         {error && (
-          <div className="mb-4 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-            <p className="font-medium">{error}</p>
-          </div>
+          <div className="mb-4"><Alert>{error}</Alert></div>
         )}
 
         {loading ? (
-          <div className="flex items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-16 text-sm text-slate-500">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Loading class workspace
-          </div>
+          <Panel>
+            <div className="flex items-center justify-center gap-2 px-4 py-16 text-sm text-slate-500">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading class workspace
+            </div>
+          </Panel>
         ) : (
           <>
             <section className="grid gap-3 md:grid-cols-4">
-              <div className="rounded-md border border-slate-200 bg-white p-4">
-                <div className="flex items-center gap-2 text-sm text-slate-500"><Users className="h-4 w-4" /> Students</div>
-                <p className="mt-2 text-2xl font-semibold text-slate-950">{students.length}</p>
-              </div>
-              <div className="rounded-md border border-slate-200 bg-white p-4">
-                <div className="flex items-center gap-2 text-sm text-slate-500"><Layers className="h-4 w-4" /> Assignments</div>
-                <p className="mt-2 text-2xl font-semibold text-slate-950">{assignments.length}</p>
-              </div>
-              <div className="rounded-md border border-slate-200 bg-white p-4">
-                <div className="flex items-center gap-2 text-sm text-slate-500"><BookOpen className="h-4 w-4" /> Active</div>
-                <p className="mt-2 text-2xl font-semibold text-slate-950">{classMetrics.activeStudents}</p>
-              </div>
-              <div className="rounded-md border border-slate-200 bg-white p-4">
-                <div className="flex items-center gap-2 text-sm text-slate-500"><CheckCircle2 className="h-4 w-4" /> Avg reflection</div>
-                <p className="mt-2 text-2xl font-semibold text-slate-950">{classMetrics.avgReflectionScore || "-"}/5</p>
-              </div>
+              <MetricCard icon={<Users className="h-4 w-4" />} label="Students" value={students.length} />
+              <MetricCard icon={<Layers className="h-4 w-4" />} label="Assignments" value={assignments.length} />
+              <MetricCard icon={<BookOpen className="h-4 w-4" />} label="Active" value={classMetrics.activeStudents} />
+              <MetricCard icon={<CheckCircle2 className="h-4 w-4" />} label="Avg reflection" value={`${classMetrics.avgReflectionScore || "-"}/5`} />
             </section>
 
             <section className="mt-6 grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
-              <div className="rounded-md border border-slate-200 bg-white">
+              <Panel>
                 <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
                   <h2 className="font-medium text-slate-950">Students</h2>
                   <span className="text-sm text-slate-500">{filtered.length} shown</span>
@@ -337,7 +329,9 @@ export default function TeacherClassPage() {
                       {filtered.map((student) => (
                         <tr key={student.id}>
                           <td className="px-4 py-3 font-medium text-slate-950">{student.studentName ?? student.student_name}</td>
-                          <td className="px-4 py-3 text-slate-600">{phaseOf(student)}</td>
+                          <td className="px-4 py-3 text-slate-600">
+                            <StatusBadge tone={phaseOf(student) === "complete" ? "success" : "primary"}>{phaseOf(student)}</StatusBadge>
+                          </td>
                           <td className="px-4 py-3 text-slate-600">{student.reflectionScore ?? student.reflection_score ?? "-"}</td>
                           <td className="max-w-sm truncate px-4 py-3 text-slate-600">{student.specText ?? student.spec_text ?? "-"}</td>
                           <td className="px-4 py-3 text-slate-600">{formatDate(student.updatedAt ?? student.updated_at)}</td>
@@ -348,18 +342,18 @@ export default function TeacherClassPage() {
                       ))}
                       {filtered.length === 0 && (
                         <tr>
-                          <td colSpan={6} className="px-4 py-12 text-center text-slate-500">No students match this phase yet.</td>
+                          <td colSpan={6}><EmptyState title="No students match this phase yet" /></td>
                         </tr>
                       )}
                     </tbody>
                   </table>
                 </div>
-              </div>
+              </Panel>
 
-              <div className="rounded-md border border-slate-200 bg-white">
+              <Panel>
                 <div className="border-b border-slate-200 px-4 py-3">
                   <h2 className="font-medium text-slate-950">Assignments</h2>
-                  <p className="mt-1 text-sm text-slate-500">Assign lessons from the built-in Python track.</p>
+                  <p className="mt-1 text-sm text-slate-500">Students start assigned lessons from their dashboard.</p>
                 </div>
                 <div className="divide-y divide-slate-200">
                   {assignments.map((assignment) => (
@@ -378,9 +372,7 @@ export default function TeacherClassPage() {
                       </p>
                     </div>
                   ))}
-                  {assignments.length === 0 && (
-                    <p className="px-4 py-6 text-sm text-slate-500">No assignments yet. Add the first lesson below.</p>
-                  )}
+                  {assignments.length === 0 && <EmptyState title="No assignments yet" description="Add a lesson from the curriculum below." />}
                 </div>
                 <div className="border-t border-slate-200 px-4 py-3">
                   <h3 className="text-sm font-medium text-slate-950">Add lesson</h3>
@@ -406,11 +398,12 @@ export default function TeacherClassPage() {
                     })}
                   </div>
                 </div>
-              </div>
+              </Panel>
             </section>
 
             <section className="mt-6 grid gap-6 lg:grid-cols-2">
-              <div className="rounded-md border border-slate-200 bg-white p-4">
+              <Panel>
+                <div className="p-4">
                 <h2 className="text-sm font-semibold text-slate-950">Reasoning signals</h2>
                 <div className="mt-3 space-y-3">
                   {reasoningSignals.slice(0, 5).map((signal) => (
@@ -424,8 +417,10 @@ export default function TeacherClassPage() {
                   ))}
                   {reasoningSignals.length === 0 && <p className="text-sm text-slate-500">Signals appear after students submit specs and code.</p>}
                 </div>
-              </div>
-              <div className="rounded-md border border-slate-200 bg-white p-4">
+                </div>
+              </Panel>
+              <Panel>
+                <div className="p-4">
                 <h2 className="text-sm font-semibold text-slate-950">Strong reflections</h2>
                 <div className="mt-3 space-y-3">
                   {exemplarReflections.map((example) => (
@@ -439,11 +434,12 @@ export default function TeacherClassPage() {
                   ))}
                   {exemplarReflections.length === 0 && <p className="text-sm text-slate-500">High-quality reflection examples will appear here after scoring.</p>}
                 </div>
-              </div>
+                </div>
+              </Panel>
             </section>
           </>
         )}
-      </div>
-    </div>
+      </PageContainer>
+    </PageFrame>
   );
 }

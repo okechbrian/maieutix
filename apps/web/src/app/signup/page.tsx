@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { signupTeacher } from "./actions";
+import { Alert, Button, Field, Panel, PageContainer, PageFrame, TextInput } from "@/components/ui";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -27,83 +28,70 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center p-4">
-      <form onSubmit={handleSubmit} className="w-full max-w-lg bg-white border border-slate-200 rounded-lg p-8 shadow-sm space-y-4">
+    <PageFrame className="flex items-center py-10">
+      <PageContainer className="max-w-2xl">
+        <Panel>
+          <form onSubmit={handleSubmit} className="space-y-5 p-6">
         <div>
-          <h2 className="text-2xl font-semibold text-slate-900">Teacher Sign Up</h2>
-          <p className="text-sm text-slate-600 mt-1">Create a teacher workspace, set up your school, and start a Python pilot class.</p>
+          <p className="text-sm font-medium text-teal-700">Teacher onboarding</p>
+          <h1 className="mt-1 text-2xl font-semibold text-slate-950">Create a teacher workspace</h1>
+          <p className="mt-1 text-sm leading-6 text-slate-600">Set up your school, create classes, and assign the Python beginner curriculum.</p>
         </div>
         
-        {error && (
-          <div className="bg-red-50 text-red-700 p-3 rounded-md text-sm">
-            {error}
-          </div>
-        )}
+        {error && <Alert>{error}</Alert>}
 
-        <div className="grid grid-cols-2 gap-4">
-          <label className="block text-sm font-medium text-slate-700">
-            Full Name
-            <input
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Full name">
+            <TextInput
               name="fullName"
               required
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500"
               placeholder="Jane Doe"
             />
-          </label>
-          <label className="block text-sm font-medium text-slate-700">
-            School Name
-            <input
+          </Field>
+          <Field label="School name">
+            <TextInput
               name="schoolName"
               required
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500"
               placeholder="Your school"
             />
-          </label>
+          </Field>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <label className="block text-sm font-medium text-slate-700">
-            Country
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Country">
             <select
               name="country"
               required
               defaultValue="UG"
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500"
+              className="min-h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500"
             >
               <option value="UG">Uganda</option>
               <option value="KE">Kenya</option>
             </select>
-          </label>
-          <label className="block text-sm font-medium text-slate-700">
-            Email
-            <input
+          </Field>
+          <Field label="Email">
+            <TextInput
               name="email"
               type="email"
               required
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500"
               placeholder="teacher@school.edu"
             />
-          </label>
+          </Field>
         </div>
 
-        <label className="block text-sm font-medium text-slate-700">
-          Password
-          <input
+        <Field label="Password" helper="Use at least 6 characters.">
+          <TextInput
             name="password"
             type="password"
             required
             minLength={6}
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500"
-            placeholder="••••••••"
+            placeholder="Password"
           />
-        </label>
+        </Field>
 
-        <button 
-          disabled={loading}
-          className="w-full rounded-md bg-teal-600 px-4 py-2 font-medium text-white hover:bg-teal-700 disabled:opacity-50"
-        >
+        <Button loading={loading} className="w-full">
           {loading ? "Creating..." : "Create teacher workspace"}
-        </button>
+        </Button>
 
         <div className="space-y-2 border-t border-slate-200 pt-4 text-sm">
           <p className="text-slate-600">
@@ -120,6 +108,8 @@ export default function SignupPage() {
           </p>
         </div>
       </form>
-    </div>
+        </Panel>
+      </PageContainer>
+    </PageFrame>
   );
 }

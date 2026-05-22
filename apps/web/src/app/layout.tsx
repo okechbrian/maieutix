@@ -3,6 +3,8 @@ import Link from "next/link";
 import "./globals.css";
 import { signOut } from "./auth/actions";
 import { createClient } from "@/utils/supabase/server";
+import { GraduationCap, LogOut } from "lucide-react";
+import { cn } from "@/components/ui";
 
 export const metadata: Metadata = {
   title: "Maieutix | Learn through questioning",
@@ -28,35 +30,39 @@ async function AuthShell({ children }: Readonly<{ children: React.ReactNode }>) 
 
   return (
     <html lang="en" className="h-full antialiased">
-      <body className="min-h-screen flex flex-col bg-slate-50">
-        <header className="bg-white border-b border-slate-200 px-6 py-4">
-          <div className="max-w-6xl mx-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <Link href="/" className="text-xl font-semibold text-slate-800">
-              Maieutix
+      <body className="min-h-screen bg-slate-50 text-slate-950">
+        <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6">
+          <div className="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <Link href={role === "student" ? "/student" : user ? "/teacher" : "/"} className="inline-flex items-center gap-2 text-slate-950">
+              <span className="flex h-9 w-9 items-center justify-center rounded-md bg-slate-950 text-white">
+                <GraduationCap className="h-5 w-5" />
+              </span>
+              <span>
+                <span className="block text-base font-semibold leading-5">Maieutix</span>
+                <span className="block text-xs font-normal text-slate-500">Socratic coding workspace</span>
+              </span>
             </Link>
             {user ? (
               <nav className="flex flex-wrap items-center gap-2 text-sm">
-                {role === "student" ? (
-                  <Link href="/student" className="rounded-md px-3 py-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900">
-                    Student home
-                  </Link>
-                ) : (
-                  <Link href="/teacher" className="rounded-md px-3 py-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900">
-                    Teacher dashboard
-                  </Link>
-                )}
+                <Link
+                  href={role === "student" ? "/student" : "/teacher"}
+                  className="rounded-md px-3 py-2 font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-950"
+                >
+                  {role === "student" ? "Student home" : "Classes"}
+                </Link>
                 <form action={signOut}>
-                  <button className="rounded-md bg-slate-900 px-3 py-2 font-medium text-white hover:bg-slate-800">
+                  <button className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 font-medium text-slate-700 hover:bg-slate-50">
+                    <LogOut className="h-4 w-4" />
                     Sign out
                   </button>
                 </form>
               </nav>
             ) : (
               <nav className="flex flex-wrap items-center gap-2 text-sm">
-                <Link href="/" className="rounded-md px-3 py-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900">
+                <Link href="/" className={cn("rounded-md px-3 py-2 font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-950")}>
                   Join class
                 </Link>
-                <Link href="/login" className="rounded-md px-3 py-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900">
+                <Link href="/login" className="rounded-md px-3 py-2 font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-950">
                   Log in
                 </Link>
                 <Link href="/signup" className="rounded-md bg-teal-600 px-3 py-2 font-medium text-white hover:bg-teal-700">
@@ -66,7 +72,7 @@ async function AuthShell({ children }: Readonly<{ children: React.ReactNode }>) 
             )}
           </div>
         </header>
-        <main className="flex-1">
+        <main>
           {children}
         </main>
       </body>

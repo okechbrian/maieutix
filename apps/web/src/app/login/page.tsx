@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { login } from "./actions";
+import { Alert, Button, Field, Panel, PageContainer, PageFrame, TextInput, cn } from "@/components/ui";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -30,18 +31,17 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center p-4">
-      <form onSubmit={handleSubmit} className="w-full max-w-md bg-white border border-slate-200 rounded-lg p-8 shadow-sm space-y-4">
+    <PageFrame className="flex items-center py-10">
+      <PageContainer className="max-w-md">
+        <Panel>
+          <form onSubmit={handleSubmit} className="space-y-5 p-6">
         <div>
-          <h2 className="text-2xl font-semibold text-slate-900">School Login</h2>
-          <p className="text-sm text-slate-600 mt-1">Teachers use email. Students use a class username.</p>
+          <p className="text-sm font-medium text-teal-700">Welcome back</p>
+          <h1 className="mt-1 text-2xl font-semibold text-slate-950">Log in to Maieutix</h1>
+          <p className="mt-1 text-sm leading-6 text-slate-600">Teachers use email. Students use their class username.</p>
         </div>
 
-        {error && (
-          <div className="bg-red-50 text-red-700 p-3 rounded-md text-sm">
-            {error}
-          </div>
-        )}
+        {error && <Alert>{error}</Alert>}
 
         <div className="grid grid-cols-2 gap-2 rounded-md bg-slate-100 p-1">
           {(["teacher", "student"] as const).map((item) => (
@@ -49,37 +49,31 @@ export default function LoginPage() {
               key={item}
               type="button"
               onClick={() => setRole(item)}
-              className={`rounded px-3 py-2 text-sm font-medium ${role === item ? "bg-white text-teal-700 shadow-sm" : "text-slate-600"}`}
+              className={cn("rounded px-3 py-2 text-sm font-medium transition", role === item ? "bg-white text-teal-700 shadow-sm" : "text-slate-600 hover:text-slate-900")}
             >
               {item === "teacher" ? "Teacher" : "Student"}
             </button>
           ))}
         </div>
-        <label className="block text-sm font-medium text-slate-700">
-          {role === "teacher" ? "Email" : "Username"}
-          <input
+
+        <Field label={role === "teacher" ? "Email" : "Username"}>
+          <TextInput
             name="identifier"
             required
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500"
             placeholder={role === "teacher" ? "teacher@school.ac.ke" : "amina.python"}
           />
-        </label>
-        <label className="block text-sm font-medium text-slate-700">
-          Password
-          <input
+        </Field>
+        <Field label="Password">
+          <TextInput
             name="password"
             type="password"
             required
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500"
             placeholder="Password"
           />
-        </label>
-        <button 
-          disabled={loading}
-          className="w-full rounded-md bg-teal-600 px-4 py-2 font-medium text-white hover:bg-teal-700 disabled:opacity-50"
-        >
+        </Field>
+        <Button loading={loading} className="w-full">
           {loading ? "Signing in..." : "Continue"}
-        </button>
+        </Button>
 
         <div className="space-y-2 border-t border-slate-200 pt-4 text-sm">
           <p className="text-slate-600">
@@ -96,6 +90,8 @@ export default function LoginPage() {
           </p>
         </div>
       </form>
-    </div>
+        </Panel>
+      </PageContainer>
+    </PageFrame>
   );
 }
