@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BookOpen, CheckCircle2, Clock, Play, Users } from "lucide-react";
+import { BookOpen, CheckCircle2, Clock, Layers, Play, Users } from "lucide-react";
 import { createClient } from "@/utils/supabase/server";
 import { startStudentSession } from "./actions";
 
@@ -18,11 +18,22 @@ type EnrollmentRecord = {
 type SessionRecord = {
   id: string;
   classroom_id: string;
+  assignment_id: string;
   lesson_id: string;
   current_phase: string;
   reflection_score: number | null;
   updated_at: string;
   assignments: { title: string } | { title: string }[] | null;
+  lessons: { title: string; prompt: string } | { title: string; prompt: string }[] | null;
+};
+
+type AssignmentRecord = {
+  id: string;
+  classroom_id: string;
+  lesson_id: string;
+  title: string;
+  due_at: string | null;
+  created_at: string;
   lessons: { title: string; prompt: string } | { title: string; prompt: string }[] | null;
 };
 
@@ -60,14 +71,34 @@ export default async function StudentPage() {
 
   const { data: sessionsData } = await supabase
     .from("sessions")
-    .select("id, classroom_id, lesson_id, current_phase, reflection_score, updated_at, assignments(title), lessons(title, prompt)")
+    .select("id, classroom_id, assignment_id, lesson_id, current_phase, reflection_score, updated_at, assignments(title), lessons(title, prompt)")
     .eq("student_user_id", authData.user.id)
     .order("updated_at", { ascending: false });
 
   const enrollments = (enrollmentsData ?? []) as EnrollmentRecord[];
+  const classroomIds = enrollments.map((enrollment) => enrollment.classroom_id);
+  const classroomById = new Map(
+    enrollments.map((enrollment) => {
+      const classroom = one(enrollment.classrooms);
+      return [enrollment.classroom_id, classroom] as const;
+    })
+  );
+
+  let assignments: AssignmentRecord[] = [];
+  if (classroomIds.length > 0) {
+    const { data: assignmentsData } = await supabase
+      .from("assignments")
+      .select("id, classroom_id, lesson_id, title, due_at, created_at, lessons(title, prompt)")
+      .in("classroom_id", classroomIds)
+      .order("created_at", { ascending: true });
+
+    assignments = (assignmentsData ?? []) as AssignmentRecord[];
+  }
+
   const sessions = (sessionsData ?? []) as SessionRecord[];
   const activeSessions = sessions.filter((session) => session.current_phase !== "complete");
   const completedSessions = sessions.filter((session) => session.current_phase === "complete");
+  const sessionByAssignmentId = new Map(sessions.map((session) => [session.assignment_id, session]));
 
   return (
     <div className="min-h-[80vh] bg-slate-50 px-4 py-6 sm:px-6">
@@ -78,10 +109,14 @@ export default async function StudentPage() {
           <p className="mt-1 text-sm text-slate-600">Resume your coding sessions or start the next class assignment.</p>
         </header>
 
-        <section className="grid gap-3 md:grid-cols-3">
+        <section className="grid gap-3 md:grid-cols-4">
           <div className="rounded-md border border-slate-200 bg-white p-4">
             <div className="flex items-center gap-2 text-sm text-slate-500"><Users className="h-4 w-4" /> Classes</div>
             <p className="mt-2 text-2xl font-semibold text-slate-950">{enrollments.length}</p>
+          </div>
+          <div className="rounded-md border border-slate-200 bg-white p-4">
+            <div className="flex items-center gap-2 text-sm text-slate-500"><Layers className="h-4 w-4" /> Assigned</div>
+            <p className="mt-2 text-2xl font-semibold text-slate-950">{assignments.length}</p>
           </div>
           <div className="rounded-md border border-slate-200 bg-white p-4">
             <div className="flex items-center gap-2 text-sm text-slate-500"><Clock className="h-4 w-4" /> Active sessions</div>
@@ -95,10 +130,10 @@ export default async function StudentPage() {
 
         <section className="mt-6 rounded-md border border-slate-200 bg-white">
           <div className="border-b border-slate-200 px-4 py-3">
-            <h2 className="font-medium text-slate-950">Your sessions</h2>
+            <h2 className="font-medium text-slate-950">Current work</h2>
           </div>
           <div className="divide-y divide-slate-200">
-            {sessions.map((session) => {
+            {activeSessions.map((session) => {
               const assignment = one(session.assignments);
               const lesson = one(session.lessons);
               return (
@@ -120,11 +155,11 @@ export default async function StudentPage() {
                 </div>
               );
             })}
-            {sessions.length === 0 && (
+            {activeSessions.length === 0 && (
               <div className="px-4 py-10 text-center">
                 <BookOpen className="mx-auto h-8 w-8 text-slate-400" />
-                <h3 className="mt-3 font-medium text-slate-950">No sessions yet</h3>
-                <p className="mt-1 text-sm text-slate-600">Start from one of your enrolled classes below.</p>
+                <h3 className="mt-3 font-medium text-slate-950">No active sessions</h3>
+                <p className="mt-1 text-sm text-slate-600">Start an assigned lesson below when you are ready.</p>
               </div>
             )}
           </div>
@@ -132,32 +167,55 @@ export default async function StudentPage() {
 
         <section className="mt-6 rounded-md border border-slate-200 bg-white">
           <div className="border-b border-slate-200 px-4 py-3">
-            <h2 className="font-medium text-slate-950">Your classes</h2>
+            <h2 className="font-medium text-slate-950">Assigned lessons</h2>
           </div>
           <div className="divide-y divide-slate-200">
-            {enrollments.map((enrollment) => {
-              const classroom = one(enrollment.classrooms);
-              const hasSession = sessions.some((session) => session.classroom_id === enrollment.classroom_id);
+            {assignments.map((assignment) => {
+              const classroom = classroomById.get(assignment.classroom_id);
+              const lesson = one(assignment.lessons);
+              const session = sessionByAssignmentId.get(assignment.id);
+              const isComplete = session?.current_phase === "complete";
+              const status = session ? (isComplete ? "Complete" : "In progress") : "Not started";
               return (
-                <div key={enrollment.classroom_id} className="flex flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between">
+                <div key={assignment.id} className="flex flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <p className="font-medium text-slate-950">{classroom?.name ?? "Classroom"}</p>
-                    <p className="mt-1 text-sm text-slate-600">Join code: {classroom?.join_code ?? "-"}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium text-slate-950">{assignment.title || lesson?.title || "Python lesson"}</p>
+                      <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">{status}</span>
+                    </div>
+                    <p className="mt-1 text-sm text-slate-600">{lesson?.prompt ?? "Continue your class assignment."}</p>
+                    <p className="mt-2 text-xs text-slate-500">
+                      {classroom?.name ?? "Classroom"} / Join code: {classroom?.join_code ?? "-"}
+                    </p>
                   </div>
-                  {hasSession ? (
-                    <span className="text-sm text-slate-500">Session already started</span>
+                  {session ? (
+                    <Link
+                      href={`/session/${session.id}`}
+                      className="inline-flex items-center justify-center gap-2 rounded-md bg-teal-600 px-3 py-2 text-sm font-medium text-white hover:bg-teal-700"
+                    >
+                      <Play className="h-4 w-4" />
+                      {isComplete ? "Review" : "Resume"}
+                    </Link>
                   ) : (
                     <form action={startStudentSession}>
-                      <input type="hidden" name="classroomId" value={enrollment.classroom_id} />
+                      <input type="hidden" name="classroomId" value={assignment.classroom_id} />
+                      <input type="hidden" name="assignmentId" value={assignment.id} />
                       <button className="inline-flex items-center justify-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800">
                         <Play className="h-4 w-4" />
-                        Start assignment
+                        Start
                       </button>
                     </form>
                   )}
                 </div>
               );
             })}
+            {enrollments.length > 0 && assignments.length === 0 && (
+              <div className="px-4 py-10 text-center">
+                <BookOpen className="mx-auto h-8 w-8 text-slate-400" />
+                <h3 className="mt-3 font-medium text-slate-950">No assigned lessons yet</h3>
+                <p className="mt-1 text-sm text-slate-600">Your teacher has not assigned a lesson to this class yet.</p>
+              </div>
+            )}
             {enrollments.length === 0 && (
               <div className="px-4 py-10 text-center">
                 <p className="text-sm text-slate-600">You are not enrolled in a class yet.</p>
@@ -168,6 +226,37 @@ export default async function StudentPage() {
             )}
           </div>
         </section>
+
+        {completedSessions.length > 0 && (
+          <section className="mt-6 rounded-md border border-slate-200 bg-white">
+            <div className="border-b border-slate-200 px-4 py-3">
+              <h2 className="font-medium text-slate-950">Completed</h2>
+            </div>
+            <div className="divide-y divide-slate-200">
+              {completedSessions.map((session) => {
+                const assignment = one(session.assignments);
+                const lesson = one(session.lessons);
+                return (
+                  <div key={session.id} className="flex flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p className="font-medium text-slate-950">{assignment?.title ?? lesson?.title ?? "Python lesson"}</p>
+                      <p className="mt-1 text-sm text-slate-600">{lesson?.prompt ?? "Completed learning session."}</p>
+                      <p className="mt-2 text-xs text-slate-500">
+                        Score: {session.reflection_score ?? "-"} / Updated {formatDate(session.updated_at)}
+                      </p>
+                    </div>
+                    <Link
+                      href={`/session/${session.id}`}
+                      className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                      Review
+                    </Link>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );
