@@ -2,7 +2,6 @@ create extension if not exists pgcrypto;
 
 create type public.app_role as enum ('owner', 'teacher', 'student');
 create type public.lesson_phase as enum ('spec', 'approved', 'editing', 'submitted', 'reflecting', 'complete');
-create type public.billing_plan as enum ('free_pilot', 'teacher', 'school');
 
 create table public.schools (
   id uuid primary key default gen_random_uuid(),
@@ -122,16 +121,6 @@ create table public.ai_events (
   created_at timestamptz not null default now()
 );
 
-create table public.billing_accounts (
-  id uuid primary key default gen_random_uuid(),
-  school_id uuid not null references public.schools(id) on delete cascade,
-  plan public.billing_plan not null default 'free_pilot',
-  stripe_customer_id text,
-  stripe_subscription_id text,
-  trial_ends_at timestamptz,
-  created_at timestamptz not null default now()
-);
-
 alter table public.schools enable row level security;
 alter table public.users enable row level security;
 alter table public.classrooms enable row level security;
@@ -142,7 +131,6 @@ alter table public.dialogue_turns enable row level security;
 alter table public.submissions enable row level security;
 alter table public.reflection_scores enable row level security;
 alter table public.ai_events enable row level security;
-alter table public.billing_accounts enable row level security;
 
 create or replace function public.current_school_id()
 returns uuid
@@ -227,7 +215,3 @@ create policy "session reflections visible through session"
 create policy "teachers see ai events in school"
   on public.ai_events for select
   using (school_id = public.current_school_id() and public.current_role() in ('owner', 'teacher'));
-
-create policy "owners see billing"
-  on public.billing_accounts for select
-  using (school_id = public.current_school_id() and public.current_role() = 'owner');

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Users, BookOpen, BarChart3 } from "lucide-react";
+import { Plus, Users, BookOpen, Activity } from "lucide-react";
 
 interface Classroom {
   id: string;
@@ -19,23 +19,13 @@ export default function TeacherDashboardPage() {
   const router = useRouter();
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [className, setClassName] = useState("");
-  const [billingPlan, setBillingPlan] = useState<string>("free_pilot");
-  const [upgrading, setUpgrading] = useState(false);
 
   async function loadData() {
-    const [classRes, billingRes] = await Promise.all([
-      fetch("/api/classrooms"),
-      fetch("/api/billing")
-    ]);
+    const classRes = await fetch("/api/classrooms");
     
     if (classRes.ok) {
       const data = await classRes.json();
       setClassrooms(data.classrooms || data); // Depending on array vs object structure
-    }
-    
-    if (billingRes.ok) {
-      const data = await billingRes.json();
-      setBillingPlan(data.plan || "free_pilot");
     }
   }
 
@@ -53,18 +43,6 @@ export default function TeacherDashboardPage() {
     if (response.ok) {
       setClassName("");
       await loadData();
-    }
-  }
-
-  async function handleUpgrade() {
-    setUpgrading(true);
-    const res = await fetch("/api/billing/checkout", { method: "POST" });
-    if (res.ok) {
-      const { url } = await res.json();
-      window.location.href = url;
-    } else {
-      setUpgrading(false);
-      alert("Failed to start checkout");
     }
   }
 
@@ -102,21 +80,8 @@ export default function TeacherDashboardPage() {
             <p className="mt-2 text-2xl font-semibold text-slate-900">Python Beginner</p>
           </div>
           <div className="rounded-lg border border-slate-200 bg-white p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-slate-500"><BarChart3 className="h-4 w-4" /> Plan</div>
-              {billingPlan === "free_pilot" && (
-                <button 
-                  onClick={handleUpgrade} 
-                  disabled={upgrading}
-                  className="text-xs font-semibold text-teal-700 hover:text-teal-800 disabled:opacity-50"
-                >
-                  {upgrading ? "Loading..." : "Upgrade"}
-                </button>
-              )}
-            </div>
-            <p className="mt-2 text-2xl font-semibold text-slate-900">
-              {billingPlan === "free_pilot" ? "Free Pilot" : "Teacher Pro"}
-            </p>
+            <div className="flex items-center gap-2 text-slate-500"><Activity className="h-4 w-4" /> Learning mode</div>
+            <p className="mt-2 text-2xl font-semibold text-slate-900">Pilot</p>
           </div>
         </div>
 

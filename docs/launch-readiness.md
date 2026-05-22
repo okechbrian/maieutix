@@ -1,6 +1,6 @@
 # Maieutix Launch Readiness
 
-This repo now runs as a single Next.js app for the current prototype. Route handlers under `apps/web/src/app/api` replace the old external `localhost:8000` dependency while Supabase is being connected.
+This repo now runs as a single Next.js app for the current prototype. Route handlers under `apps/web/src/app/api` replace the old external `localhost:8000` dependency and use Supabase as the MVP persistence layer.
 
 The product direction is aligned to `Maieutic_Video_Analysis_Replication_Guide.pdf`: spec-first programming education, Socratic AI approval, locked editor, autocomplete disabled, syntax-only coding help, and reflection through spec-vs-code gap analysis.
 
@@ -20,17 +20,17 @@ Copy `apps/web/.env.example` into Vercel project settings and provide real value
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `OPENAI_API_KEY`
 - `MAIEUTIX_AI_MODEL`
-- `STRIPE_SECRET_KEY`
-- `STRIPE_WEBHOOK_SECRET`
 - `NEXT_PUBLIC_APP_URL`
 
 ## Supabase
 
-Apply `infra/supabase/migrations/0001_school_platform.sql` in a Supabase project. It creates the school, user, classroom, curriculum, session, dialogue, submission, reflection, AI audit, and billing tables with starter row-level security policies.
+Apply `infra/supabase/migrations/0001_school_platform.sql` in a Supabase project. It creates the school, user, classroom, curriculum, session, dialogue, submission, reflection, and AI audit tables with starter row-level security policies.
+
+For the local demo classroom, create an owner user in Supabase Auth, replace `owner_user_id` in `infra/supabase/seed-demo.sql`, and run that seed. It creates the demo school, classroom `MAI-101`, Python Beginner course records, and a default assignment.
 
 ## AI Coach
 
-The coach uses the OpenAI Responses API with `MAIEUTIX_AI_MODEL`, defaulting to `gpt-5-mini`. If `OPENAI_API_KEY` is missing or the API fails, the app returns a guided fallback question and records an AI event.
+The coach uses a chat-completions-compatible API with `MAIEUTIX_AI_MODEL`, defaulting to `gpt-5-mini`. If `OPENAI_API_KEY` is missing or the API fails, the app returns a guided fallback question and records an AI event.
 
 The coach must preserve the Maieutic role:
 
@@ -41,11 +41,15 @@ The coach must preserve the Maieutic role:
 - During coding, answer narrow syntax questions only.
 - Refuse complete-solution and "fix my code" requests.
 
+## Current Stabilization State
+
+- Supabase is the primary store; no in-memory fallback is expected.
+- Teacher signup and student join use Supabase Auth plus `public.users`.
+- Local production builds use system fonts, not Google font fetches.
+
 ## Remaining Hardening
 
-- Replace the in-memory demo store with Supabase queries.
-- Wire Supabase Auth for teacher email/password and student username/password accounts.
+- Add generated Supabase database types instead of local row types.
 - Replace local rule-based spec approval and gap analysis with structured LLM outputs.
 - Add cohort reasoning analytics: vague specs, drift patterns, concept struggles, and exemplar reflections.
-- Add Stripe checkout and webhook handlers after the free pilot gate.
 - Add Playwright E2E smoke tests for student lesson completion and teacher reporting.

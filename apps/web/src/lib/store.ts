@@ -2,17 +2,48 @@ import { courses, getDefaultLesson, getLesson } from "./curriculum";
 import { analyzeReasoningSignals } from "./maieutic";
 import { createClient } from "../utils/supabase/server";
 import type {
-  Assignment,
   Classroom,
   DialogueTurn,
   LearningSession,
-  ReflectionScore,
-  School,
-  Submission,
-  User,
 } from "./types";
 
-function mapSession(row: any): LearningSession {
+type SessionRow = {
+  id: string;
+  classroom_id: string;
+  assignment_id: string;
+  lesson_id: string;
+  student_user_id: string;
+  current_phase: LearningSession["currentPhase"];
+  spec_text: string | null;
+  code_text: string | null;
+  test_output: string | null;
+  reflection_text: string | null;
+  reflection_score: number | null;
+  started_at: string;
+  updated_at: string;
+  users?: { full_name: string | null } | null;
+};
+
+type ClassroomRow = {
+  id: string;
+  school_id: string;
+  teacher_id: string;
+  name: string;
+  join_code: string;
+  created_at: string;
+};
+
+type AiEventInput = {
+  sessionId: string;
+  model: string;
+  status: string;
+  responseId?: string;
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  error?: string;
+};
+
+function mapSession(row: SessionRow): LearningSession {
   return {
     id: row.id,
     classroomId: row.classroom_id,
@@ -31,7 +62,7 @@ function mapSession(row: any): LearningSession {
   };
 }
 
-function mapClassroom(row: any): Classroom {
+function mapClassroom(row: ClassroomRow): Classroom {
   return {
     id: row.id,
     schoolId: row.school_id,
@@ -159,6 +190,7 @@ export async function createAssignment(classroomId: string, lessonId: string) {
 export async function createSession(input: {
   classroomId: string;
   studentName: string;
+  studentUserId?: string;
   assignmentId?: string;
   lessonId?: string;
 }) {
@@ -183,7 +215,9 @@ export async function createSession(input: {
   // Ensure user is authenticated. In this simplified model, 
   // student needs to be signed up. If anonymous auth is not used, 
   // we might need to handle user creation first.
-  const { data: userData } = await supabase.auth.getUser();
+  const { data: userData } = input.studentUserId
+    ? { data: { user: { id: input.studentUserId } } }
+    : await supabase.auth.getUser();
   if (!userData.user) throw new Error("Not authenticated as student");
 
   const { data: sessionData, error: sessionError } = await supabase.from('sessions').insert({
@@ -214,14 +248,21 @@ export async function getSession(sessionId: string) {
 export async function updateSession(sessionId: string, patch: Partial<LearningSession>) {
   const supabase = await createClient();
   
-  const dbPatch: any = {};
+  const dbPatch: {
+    current_phase?: LearningSession["currentPhase"];
+    spec_text?: string | null;
+    code_text?: string | null;
+    test_output?: string | null;
+    reflection_text?: string | null;
+    reflection_score?: number | null;
+    updated_at: string;
+  } = { updated_at: new Date().toISOString() };
   if (patch.currentPhase !== undefined) dbPatch.current_phase = patch.currentPhase;
   if (patch.specText !== undefined) dbPatch.spec_text = patch.specText;
   if (patch.codeText !== undefined) dbPatch.code_text = patch.codeText;
   if (patch.testOutput !== undefined) dbPatch.test_output = patch.testOutput;
   if (patch.reflectionText !== undefined) dbPatch.reflection_text = patch.reflectionText;
   if (patch.reflectionScore !== undefined) dbPatch.reflection_score = patch.reflectionScore;
-  dbPatch.updated_at = new Date().toISOString();
 
   const { data, error } = await supabase.from('sessions').update(dbPatch).eq('id', sessionId).select('*, users(full_name)').single();
   if (error) throw new Error(error.message);
@@ -241,7 +282,7 @@ export async function addDialogueTurn(sessionId: string, role: DialogueTurn["rol
   return {
     id: data.id,
     sessionId: data.session_id,
-    role: data.role as any,
+    role: data.role as DialogueTurn["role"],
     content: data.content,
     timestamp: data.created_at,
   };
@@ -255,7 +296,7 @@ export async function listDialogue(sessionId: string) {
   return data.map(row => ({
     id: row.id,
     sessionId: row.session_id,
-    role: row.role as any,
+    role: row.role as DialogueTurn["role"],
     content: row.content,
     timestamp: row.created_at,
   }));
@@ -388,7 +429,7 @@ export async function getClassroomInsights(classroomId: string) {
   };
 }
 
-export async function addAiEvent(event: any) {
+export async function addAiEvent(event: AiEventInput) {
   const supabase = await createClient();
   const { data: session } = await supabase.from('sessions').select('classroom_id').eq('id', event.sessionId).single();
   const { data: classroom } = session ? await supabase.from('classrooms').select('school_id').eq('id', session.classroom_id).single() : { data: null };

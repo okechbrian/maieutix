@@ -84,13 +84,14 @@ export async function joinClassroom(formData: FormData) {
     const session = await createSession({
       classroomId: classroom.id,
       studentName: fullName,
+      studentUserId: userId,
     });
 
     revalidatePath("/", "layout");
     
     return { redirect: `/session/${session.id}` };
 
-  } catch (error: any) {
-    return { error: error.message || "Failed to complete enrollment" };
+  } catch (error: unknown) {
+    return { error: error instanceof Error ? error.message : "Failed to complete enrollment" };
   }
 }

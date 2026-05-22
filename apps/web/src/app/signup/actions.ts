@@ -64,21 +64,11 @@ export async function signupTeacher(formData: FormData) {
 
     if (userError) throw new Error(userError.message);
 
-    // 5. Create default billing account
-    const { error: billingError } = await adminClient
-      .from("billing_accounts")
-      .insert({
-        school_id: schoolData.id,
-        plan: "free_pilot",
-      });
-      
-    if (billingError) console.error("Billing error (non-fatal):", billingError);
-
     revalidatePath("/", "layout");
     return { success: true };
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     // If we failed after auth creation, it leaves an orphaned auth user, but for demo we throw
-    return { error: error.message || "Failed to initialize school profile" };
+    return { error: error instanceof Error ? error.message : "Failed to initialize school profile" };
   }
 }

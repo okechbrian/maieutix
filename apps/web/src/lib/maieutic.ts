@@ -228,7 +228,7 @@ export function analyzeReasoningSignals(sessions: ReasoningAnalyticsInput[]) {
     }
 
     if (session.latestGapAnalysis) {
-      for (const [gapKey, gapMessage] of Object.entries(session.latestGapAnalysis)) {
+      for (const gapKey of Object.keys(session.latestGapAnalysis)) {
          // Create a readable label from the gap key, e.g. "missing_input" -> "Missing input"
          const label = `LLM Flag: ${gapKey.replace(/_/g, " ")}`;
          addSignal(signals, label, studentName);
