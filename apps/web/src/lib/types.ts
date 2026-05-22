@@ -104,3 +104,16 @@ export interface ReflectionScore {
   message: string;
   createdAt: string;
 }
+
+export type TeacherReviewCategory = "general" | "spec" | "code" | "reflection";
+export type TeacherReviewStatus = "reviewed" | "needs_attention";
+
+export interface TeacherReview {
+  id: string;
+  sessionId: string;
+  teacherUserId: string;
+  category: TeacherReviewCategory;
+  status: TeacherReviewStatus;
+  message: string;
+  createdAt: string;
+}

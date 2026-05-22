@@ -5,6 +5,9 @@ import type {
   Classroom,
   DialogueTurn,
   LearningSession,
+  TeacherReview,
+  TeacherReviewCategory,
+  TeacherReviewStatus,
 } from "./types";
 
 type SessionRow = {
@@ -52,6 +55,25 @@ type AiEventInput = {
   error?: string;
 };
 
+type TeacherReviewRow = {
+  id: string;
+  session_id: string;
+  teacher_user_id: string;
+  category: TeacherReviewCategory;
+  status: TeacherReviewStatus;
+  message: string;
+  created_at: string;
+};
+
+type SubmissionRow = {
+  id: string;
+  session_id: string;
+  code_text: string;
+  gap_analysis: Record<string, string>;
+  reflection_prompts: string[];
+  created_at: string;
+};
+
 function mapSession(row: SessionRow): LearningSession {
   return {
     id: row.id,
@@ -78,6 +100,18 @@ function mapClassroom(row: ClassroomRow): Classroom {
     teacherId: row.teacher_id,
     name: row.name,
     joinCode: row.join_code,
+    createdAt: row.created_at,
+  };
+}
+
+function mapTeacherReview(row: TeacherReviewRow): TeacherReview {
+  return {
+    id: row.id,
+    sessionId: row.session_id,
+    teacherUserId: row.teacher_user_id,
+    category: row.category,
+    status: row.status,
+    message: row.message,
     createdAt: row.created_at,
   };
 }
@@ -356,6 +390,71 @@ export async function listDialogue(sessionId: string) {
   }));
 }
 
+export async function listTeacherReviews(sessionId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("teacher_reviews")
+    .select("*")
+    .eq("session_id", sessionId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
+  return (data as TeacherReviewRow[]).map(mapTeacherReview);
+}
+
+export async function createTeacherReview(input: {
+  sessionId: string;
+  category: TeacherReviewCategory;
+  status: TeacherReviewStatus;
+  message: string;
+}) {
+  const supabase = await createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) throw new Error("Not authenticated");
+
+  const message = input.message.trim();
+  if (message.length < 3) throw new Error("Feedback message is required");
+
+  const { data, error } = await supabase
+    .from("teacher_reviews")
+    .insert({
+      session_id: input.sessionId,
+      teacher_user_id: userData.user.id,
+      category: input.category,
+      status: input.status,
+      message,
+    })
+    .select("*")
+    .single();
+
+  if (error) throw new Error(error.message);
+  return mapTeacherReview(data as TeacherReviewRow);
+}
+
+export async function getLatestSubmission(sessionId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("submissions")
+    .select("*")
+    .eq("session_id", sessionId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+
+  const row = data as SubmissionRow;
+  return {
+    id: row.id,
+    sessionId: row.session_id,
+    codeText: row.code_text,
+    gapAnalysis: row.gap_analysis,
+    reflectionPrompts: row.reflection_prompts,
+    createdAt: row.created_at,
+  };
+}
+
 export async function addSubmission(sessionId: string, codeText: string, gapAnalysis: Record<string, string>, reflectionPrompts: string[]) {
   const supabase = await createClient();
   const { data, error } = await supabase.from('submissions').insert({
@@ -400,9 +499,26 @@ export async function listClassroomStudents(classroomId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase.from('sessions').select('*, users(full_name)').eq('classroom_id', classroomId);
   if (error) throw new Error(error.message);
+
+  const sessionIds = data.map((row) => row.id);
+  const { data: reviewsData } = sessionIds.length
+    ? await supabase
+      .from("teacher_reviews")
+      .select("session_id, status, category, message, created_at")
+      .in("session_id", sessionIds)
+      .order("created_at", { ascending: false })
+    : { data: [] };
+
+  const latestReviews = new Map<string, { status: string; category: string; message: string; created_at: string }>();
+  for (const review of reviewsData || []) {
+    if (!latestReviews.has(review.session_id)) {
+      latestReviews.set(review.session_id, review);
+    }
+  }
   
   return data.map(row => {
     const session = mapSession(row);
+    const latestReview = latestReviews.get(session.id);
     return {
       id: session.id,
       student_name: session.studentName,
@@ -415,6 +531,14 @@ export async function listClassroomStudents(classroomId: string) {
       codeText: session.codeText,
       reflection_score: session.reflectionScore,
       reflectionScore: session.reflectionScore,
+      review_status: latestReview?.status ?? null,
+      reviewStatus: latestReview?.status ?? null,
+      review_category: latestReview?.category ?? null,
+      reviewCategory: latestReview?.category ?? null,
+      latest_review_at: latestReview?.created_at ?? null,
+      latestReviewAt: latestReview?.created_at ?? null,
+      latest_review_message: latestReview?.message ?? null,
+      latestReviewMessage: latestReview?.message ?? null,
       started_at: session.startedAt,
       startedAt: session.startedAt,
       updated_at: session.updatedAt,

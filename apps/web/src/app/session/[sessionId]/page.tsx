@@ -42,6 +42,14 @@ interface GapAnalysis {
   [key: string]: string;
 }
 
+interface TeacherReview {
+  id: string;
+  category: "general" | "spec" | "code" | "reflection";
+  status: "reviewed" | "needs_attention";
+  message: string;
+  createdAt: string;
+}
+
 const PHASES = ["spec", "approved", "editing", "submitted", "reflecting", "complete"];
 const PHASE_LABELS: Record<string, string> = {
   spec: "Spec",
@@ -87,6 +95,7 @@ export default function SessionPage() {
   const [reflectionMessage, setReflectionMessage] = useState("");
   const [gapAnalysis, setGapAnalysis] = useState<GapAnalysis | null>(null);
   const [reflectionPrompts, setReflectionPrompts] = useState<string[]>([]);
+  const [teacherReviews, setTeacherReviews] = useState<TeacherReview[]>([]);
   const [runOutput, setRunOutput] = useState("");
   const [runningCode, setRunningCode] = useState(false);
 
@@ -140,20 +149,33 @@ export default function SessionPage() {
     }
   }, [sessionId]);
 
+  const fetchTeacherReviews = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/reviews`);
+      if (res.ok) {
+        const data = await res.json();
+        setTeacherReviews(data.reviews || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch teacher reviews", err);
+    }
+  }, [sessionId]);
+
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    await Promise.all([fetchSession(), fetchDialogue()]);
+    await Promise.all([fetchSession(), fetchDialogue(), fetchTeacherReviews()]);
     setLoading(false);
-  }, [fetchSession, fetchDialogue]);
+  }, [fetchSession, fetchDialogue, fetchTeacherReviews]);
 
   useEffect(() => {
     fetchAll();
     const interval = setInterval(() => {
       fetchSession();
       fetchDialogue();
+      fetchTeacherReviews();
     }, 5000);
     return () => clearInterval(interval);
-  }, [fetchAll, fetchSession, fetchDialogue]);
+  }, [fetchAll, fetchSession, fetchDialogue, fetchTeacherReviews]);
 
   const handleSendSpec = async () => {
     if (!specInput.trim()) return;
@@ -368,6 +390,25 @@ export default function SessionPage() {
         )}
       </div>
       </div>
+
+      {teacherReviews.length > 0 && (
+        <Panel className="mb-6" title="Teacher feedback" description="Feedback from your teacher for this session.">
+          <div className="divide-y divide-slate-200">
+            {teacherReviews.map((review) => (
+              <div key={review.id} className="p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusBadge tone={review.status === "needs_attention" ? "warning" : "success"}>
+                    {review.status === "needs_attention" ? "Needs attention" : "Reviewed"}
+                  </StatusBadge>
+                  <StatusBadge tone="muted">{review.category}</StatusBadge>
+                  <span className="text-xs text-slate-500">{new Date(review.createdAt).toLocaleString()}</span>
+                </div>
+                <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">{review.message}</p>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      )}
 
       {isComplete && (
         <Panel>

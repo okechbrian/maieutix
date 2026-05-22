@@ -26,6 +26,12 @@ interface Student {
   spec_text?: string | null;
   reflectionScore?: number | null;
   reflection_score?: number | null;
+  reviewStatus?: string | null;
+  review_status?: string | null;
+  latestReviewAt?: string | null;
+  latest_review_at?: string | null;
+  latestReviewMessage?: string | null;
+  latest_review_message?: string | null;
   updatedAt?: string;
   updated_at?: string;
 }
@@ -111,6 +117,7 @@ export default function TeacherClassPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [phase, setPhase] = useState("all");
+  const [reviewFilter, setReviewFilter] = useState("all");
   const [classroom, setClassroom] = useState<Classroom | null>(null);
   const [insights, setInsights] = useState<{
     reasoningSignals?: ReasoningSignal[];
@@ -129,7 +136,14 @@ export default function TeacherClassPage() {
     [assignments]
   );
 
-  const filtered = phase === "all" ? students : students.filter((student) => phaseOf(student) === phase);
+  const filteredByPhase = phase === "all" ? students : students.filter((student) => phaseOf(student) === phase);
+  const filtered = reviewFilter === "all"
+    ? filteredByPhase
+    : filteredByPhase.filter((student) => {
+      const status = student.reviewStatus ?? student.review_status;
+      if (reviewFilter === "not_reviewed") return !status;
+      return status === reviewFilter;
+    });
   const reasoningSignals = insights?.reasoningSignals ?? insights?.reasoning_signals ?? [];
   const exemplarReflections = insights?.exemplarReflections ?? insights?.exemplar_reflections ?? [];
 
@@ -272,7 +286,7 @@ export default function TeacherClassPage() {
           <span className="text-sm text-slate-400">/</span>
           <span className="text-sm text-slate-500">{filtered.length} students shown</span>
         </div>
-          <div className="mb-4 flex gap-2">
+          <div className="mb-4 flex flex-wrap gap-2">
             <label className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700">
               <Filter className="h-4 w-4" />
               <select value={phase} onChange={(event) => setPhase(event.target.value)} className="bg-transparent outline-none">
@@ -283,6 +297,15 @@ export default function TeacherClassPage() {
                 <option value="submitted">Submitted</option>
                 <option value="reflecting">Reflecting</option>
                 <option value="complete">Complete</option>
+              </select>
+            </label>
+            <label className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700">
+              <CheckCircle2 className="h-4 w-4" />
+              <select value={reviewFilter} onChange={(event) => setReviewFilter(event.target.value)} className="bg-transparent outline-none">
+                <option value="all">All reviews</option>
+                <option value="needs_attention">Needs attention</option>
+                <option value="reviewed">Reviewed</option>
+                <option value="not_reviewed">Not reviewed</option>
               </select>
             </label>
           </div>
@@ -319,6 +342,7 @@ export default function TeacherClassPage() {
                       <tr>
                         <th className="px-4 py-3 font-medium">Student</th>
                         <th className="px-4 py-3 font-medium">Phase</th>
+                        <th className="px-4 py-3 font-medium">Review</th>
                         <th className="px-4 py-3 font-medium">Score</th>
                         <th className="px-4 py-3 font-medium">Spec</th>
                         <th className="px-4 py-3 font-medium">Updated</th>
@@ -332,17 +356,29 @@ export default function TeacherClassPage() {
                           <td className="px-4 py-3 text-slate-600">
                             <StatusBadge tone={phaseOf(student) === "complete" ? "success" : "primary"}>{phaseOf(student)}</StatusBadge>
                           </td>
+                          <td className="px-4 py-3 text-slate-600">
+                            {student.reviewStatus ?? student.review_status ? (
+                              <div>
+                                <StatusBadge tone={(student.reviewStatus ?? student.review_status) === "needs_attention" ? "warning" : "success"}>
+                                  {(student.reviewStatus ?? student.review_status) === "needs_attention" ? "Needs attention" : "Reviewed"}
+                                </StatusBadge>
+                                <p className="mt-1 text-xs text-slate-500">{formatDate(student.latestReviewAt ?? student.latest_review_at)}</p>
+                              </div>
+                            ) : (
+                              <StatusBadge tone="muted">Not reviewed</StatusBadge>
+                            )}
+                          </td>
                           <td className="px-4 py-3 text-slate-600">{student.reflectionScore ?? student.reflection_score ?? "-"}</td>
                           <td className="max-w-sm truncate px-4 py-3 text-slate-600">{student.specText ?? student.spec_text ?? "-"}</td>
                           <td className="px-4 py-3 text-slate-600">{formatDate(student.updatedAt ?? student.updated_at)}</td>
                           <td className="px-4 py-3 text-right">
-                            <a className="font-medium text-teal-700 hover:text-teal-900" href={`/session/${student.id}`}>Open</a>
+                            <a className="font-medium text-teal-700 hover:text-teal-900" href={`/teacher/reviews/${student.id}`}>Review</a>
                           </td>
                         </tr>
                       ))}
                       {filtered.length === 0 && (
                         <tr>
-                          <td colSpan={6}><EmptyState title="No students match this phase yet" /></td>
+                          <td colSpan={7}><EmptyState title="No students match these filters yet" /></td>
                         </tr>
                       )}
                     </tbody>
