@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Check, Circle, PartyPopper, ArrowRight, Lightbulb } from "lucide-react";
@@ -94,6 +94,8 @@ export default function SessionPage() {
   const [codeInput, setCodeInput] = useState("# Write your code here\n");
   const [reflectionInput, setReflectionInput] = useState("");
   const [actionError, setActionError] = useState("");
+  const initializedSpecInput = useRef(false);
+  const initializedCodeInput = useRef(false);
 
   const fetchSession = useCallback(async () => {
     try {
@@ -105,12 +107,15 @@ export default function SessionPage() {
       if (sessionRes.ok) {
         const data = await sessionRes.json();
         setSession(data);
-        if (data.specText && !specInput) {
+        if (!initializedSpecInput.current && data.specText) {
           setSpecInput(data.specText);
         }
-        if (data.codeText && codeInput === "# Write your code here\n") {
+        initializedSpecInput.current = true;
+
+        if (!initializedCodeInput.current && data.codeText) {
           setCodeInput(data.codeText);
         }
+        initializedCodeInput.current = true;
       }
 
       if (statusRes.ok) {
@@ -120,7 +125,7 @@ export default function SessionPage() {
     } catch (err) {
       console.error("Failed to fetch session", err);
     }
-  }, [sessionId, specInput, codeInput]);
+  }, [sessionId]);
 
   const fetchDialogue = useCallback(async () => {
     try {
@@ -162,9 +167,13 @@ export default function SessionPage() {
       if (res.ok) {
         await fetchSession();
         await fetchDialogue();
+      } else {
+        const data = await res.json();
+        setActionError(data.error ?? "Spec could not be saved.");
       }
     } catch (err) {
       console.error("Failed to send spec", err);
+      setActionError("Spec could not be saved.");
     } finally {
       setSendingSpec(false);
     }
